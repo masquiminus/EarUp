@@ -513,7 +513,11 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   </div>
   <h2>Timbre</h2>
   <div class="modes" id="zoneTimbres"></div>
-  <div class="lot"><button id="btnEch">Charger des échantillons</button></div>
+  <div class="lot">
+    <button id="btnEch">Charger des échantillons</button>
+    <button id="btnRecharger">Recharger depuis le site</button>
+  </div>
+  <p class="avert" id="avertSons" hidden></p>
   <p class="avert" id="avertEch">Fichiers nommés timbre-numéroMIDI : piano-45.wav, contrebasse-33.wav. Une note tous les 3 demi-tons suffit, le reste est transposé.</p>
   <div class="ligne">
     <p>Écoute<small>En bloc, tout sonne ensemble. Arpégé, une note après l'autre.</small></p>
@@ -550,7 +554,6 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   </div>
   <p class="avert" id="avertStock"></p>
   <p class="avert" id="avertMaj" hidden></p>
-  <p class="avert" id="avertSons" hidden></p>
 
   <h2>Sons de retour</h2>
   <div class="ligne">
@@ -2407,7 +2410,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.0';
+const VERSION_APP = '1.1';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4752,6 +4755,14 @@ $('btnModule').onclick = () => {
 lireScores(); chargerCfg(); refletReglages(); construireBasse(); remplirBanc();
 construireModes(); construireTimbres(); majTableauReglages();
 chargerInstruments();
+
+/* ⭐ De quoi diagnostiquer depuis le téléphone : on relance le chargement et le
+   bandeau dit exactement ce qui échoue, chemin et code d'erreur compris. */
+$('btnRecharger').onclick = () => {
+  const e = $('avertSons');
+  if(e){ e.hidden = false; e.textContent = 'Chargement…'; }
+  chargerInstruments();
+};
 
 const CHAMP_SON = {juste:'nomJuste', faux:'nomFaux', passe:'nomPasse'};
 function majSons(message){
