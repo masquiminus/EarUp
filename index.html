@@ -550,6 +550,7 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   </div>
   <p class="avert" id="avertStock"></p>
   <p class="avert" id="avertMaj" hidden></p>
+  <p class="avert" id="avertSons" hidden></p>
 
   <h2>Sons de retour</h2>
   <div class="ligne">
@@ -2022,7 +2023,10 @@ const BANQUES_SAX = [];
 const idsBanques = () => TIMBRES.map(t => t.id).concat(BANQUES_SAX);
 
 function analyserNom(nom){
-  const base = nom.replace(/\.[^.]+$/,'').toLowerCase();
+  /* ⭐ Les entrées peuvent porter un DOSSIER — « saxes/saxbary-forte-36.mp3 » —
+     pour que le dossier `sons` reste rangé quand les timbres s'accumuleront.
+     Seule la fin du chemin nous renseigne. */
+  const base = nom.split('/').pop().replace(/\.[^.]+$/,'').toLowerCase();
   const m = base.match(/^(.+?)[-_](\d{1,3})$/);
   if(!m) return null;
   const id = idsBanques().find(x => x === m[1]);
@@ -2034,7 +2038,7 @@ function analyserNom(nom){
 async function ajouterEchantillons(fichiers){
   let pris = 0, refus = 0;
   for(const f of fichiers){
-    const info = analyserNom(f.name);
+    const info = analyserNom(f.webkitRelativePath || f.name);
     if(!info){ refus++; continue; }
     try{
       (ECH[info.id] = ECH[info.id] || {})[info.midi] =
@@ -2047,25 +2051,61 @@ async function ajouterEchantillons(fichiers){
     + (refus ? ` · ${refus} refusée${refus>1?'s':''} — attendu : timbre-numéroMIDI.wav` : '');
 }
 
-/* Servie (Tauri, serveur local), l'app lit sons/instruments.json : une simple
-   liste de noms de fichiers, ex. ["piano-45.ogg","contrebasse-33.ogg"] */
+/* Servie (Tauri, serveur local), l'app lit sons/instruments.json : une liste de
+   chemins, avec ou sans dossier — ["saxes/saxbary-forte-36.mp3","piano-45.ogg"].
+   Le dossier n'est là que pour le rangement ; c'est le NOM DU FICHIER qui dit le
+   timbre et la note. */
 async function chargerInstruments(){
+  const dire = t => { const e = $('avertSons'); if(e){ e.hidden = !t; e.textContent = t || ''; } };
+  let manifeste;
   try{
     const r = await fetch('sons/instruments.json');
-    if(!r.ok) return;
-    for(const nom of await r.json()){
-      const info = analyserNom(nom);
-      if(!info) continue;
-      try{
-        const f = await fetch(`sons/${nom}`);
-        if(!f.ok) continue;
-        (ECH[info.id] = ECH[info.id] || {})[info.midi] =
-          await contexte().decodeAudioData(await f.arrayBuffer());
-      }catch(e){ /* note absente : on passe */ }
+    if(!r.ok){ dire(`sons/instruments.json : erreur ${r.status}. Les timbres restent en synthèse.`); return; }
+    manifeste = await r.json();
+  }catch(e){ return; }                      // en file:// il n'y a rien à charger, c'est normal
+  if(!Array.isArray(manifeste) || !manifeste.length){
+    dire('sons/instruments.json est vide ou mal formé.'); return;
+  }
+
+  /* ⚠️ Ce chargement se faisait UN FICHIER À LA FOIS, en attendant chacun : sur
+     un téléphone, 312 échantillons prenaient plusieurs minutes et rien ne
+     s'affichait entre-temps. On charge par paquets, et l'écran se met à jour au
+     fur et à mesure. Surtout : les échecs ne sont plus avalés en silence. */
+  let faits = 0, rates = 0, refuses = 0;
+  const premierRate = [];
+  const front = 8;
+
+  const un = async nom => {
+    const info = analyserNom(nom);
+    if(!info){ refuses++; if(premierRate.length < 3) premierRate.push(nom + ' (nom non reconnu)'); return; }
+    try{
+      const f2 = await fetch('sons/' + nom);
+      if(!f2.ok) throw new Error('erreur ' + f2.status);
+      (ECH[info.id] = ECH[info.id] || {})[info.midi] =
+        await contexte().decodeAudioData(await f2.arrayBuffer());
+      faits++;
+    }catch(e){
+      rates++;
+      if(premierRate.length < 3) premierRate.push('sons/' + nom + ' : ' + e.message);
     }
-  }catch(e){ /* pas de manifeste : synthèse */ }
+  };
+
+  for(let i = 0; i < manifeste.length; i += front){
+    await Promise.all(manifeste.slice(i, i + front).map(un));
+    dire(`Chargement des sons : ${faits + rates + refuses} / ${manifeste.length}`);
+    construireTimbres();
+  }
+
   construireTimbres();
+  if(rates || refuses){
+    dire(`${faits} sons chargés, ${rates + refuses} en échec. `
+       + premierRate.join(' · '));
+  }else{
+    dire(`${faits} sons chargés.`);
+    setTimeout(() => dire(''), 4000);
+  }
 }
+
 
 /* Une voix : l'échantillon le plus proche transposé, ou le profil de synthèse. */
 /* Le premier instant où l'échantillon dépasse le seuil d'audibilité. Calculé
