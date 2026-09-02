@@ -1,0 +1,20 @@
+{
+  "name": "EarUp — travail de l'oreille harmonique",
+  "short_name": "EarUp",
+  "description": "Reconnaissance d'accords, tonalité et jeu sur grille, pour musiciens confirmés.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12100e",
+  "theme_color": "#12100e",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icone.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
