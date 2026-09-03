@@ -403,46 +403,31 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   <div class="moniteur" id="bancEtat">Touche un accord pour l'entendre</div>
   <h1 id="titreMode">Recon OP</h1>
   <div class="lot"><button id="btnAccueil">Changer de mode</button></div>
-  <div id="reglagesPrat" hidden>
-    <h1 class="section">Rythme</h1>
-    <h2>Tempo <small id="litTempoP">120</small></h2>
-    <input type="range" id="curTempoP" min="40" max="240" step="2" value="120">
-    <div class="segments souple" id="segRythmeP"></div>
-    <div id="blocFreqP" hidden>
-      <h2>Changement d'accord</h2>
-      <div class="segments souple" id="segFreqP"></div>
-    </div>
-
-    <h1 class="section">Ma grille</h1>
-    <div id="zoneGrille"></div>
-    <div class="segments souple" id="cmdGrille"></div>
-    <div id="blocEditAccord" hidden>
-      <h2 id="titreEdit">Mesure 1</h2>
-      <div class="segments souple" id="zoneNotes"></div>
-      <div class="segments souple" id="zoneNatures"></div>
-    </div>
-  </div>
-
+  <!-- ⭐ Un SEUL panneau pour le Terrain et Practice. Chaque réglage est un bloc
+       nommé ; `ordonnerReglages()` les range et les masque selon le mode et le
+       régime, plutôt que de dupliquer le balisage. -->
   <div id="reglagesJam" hidden>
-    <h1 class="section" id="titreHarmonie">Harmonie</h1>
-    <div id="blocNiveauJam">
-      <h2>Niveau</h2>
-      <div class="segments souple" id="segNiveauJam"></div>
-    </div>
-    <div id="blocFamilles" hidden>
-      <h2>Familles d'accords</h2>
-      <div class="segments souple" id="segFamilles"></div>
-    </div>
-    <div id="blocParMesure">
-      <h2>Changement d'accord</h2>
-      <div class="segments souple" id="segParMesure"></div>
-    </div>
-    <div id="blocBoucle">
-      <h2>Grille</h2>
-      <div class="segments souple" id="segBoucle"></div>
+    <div id="blocHarmonie">
+      <h1 class="section">Harmonie</h1>
+      <div id="blocNiveauJam">
+        <h2>Niveau</h2>
+        <div class="segments souple" id="segNiveauJam"></div>
+      </div>
+      <div id="blocFamilles" hidden>
+        <h2>Familles d'accords</h2>
+        <div class="segments souple" id="segFamilles"></div>
+      </div>
+      <div id="blocParMesure">
+        <h2>Changement d'accord</h2>
+        <div class="segments souple" id="segParMesure"></div>
+      </div>
+      <div id="blocBoucle">
+        <h2>Grille</h2>
+        <div class="segments souple" id="segBoucle"></div>
+      </div>
     </div>
 
-    <h1 class="section">Rythme</h1>
+    <div id="blocTitreRythme"><h1 class="section">Rythme</h1></div>
     <div id="blocTempoJam">
       <h2>Tempo <small id="litTempo">120</small></h2>
       <input type="range" id="curTempo" min="40" max="240" step="2" value="120">
@@ -450,6 +435,35 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     <div id="blocRythmeJam">
       <div class="segments souple" id="segRythme"></div>
     </div>
+
+    <div id="blocGrille" hidden>
+      <h1 class="section">Ma grille</h1>
+      <div id="zoneGrille"></div>
+      <div class="segments souple" id="cmdGrille"></div>
+      <div id="blocEditAccord" hidden>
+        <h2 id="titreEdit">Mesure 1</h2>
+        <div class="segments souple" id="zoneNotes"></div>
+        <div class="segments souple" id="zoneNatures"></div>
+      </div>
+    </div>
+
+    <div id="blocMetrique">
+      <h2 id="titreMetrique">Métrique</h2>
+      <div class="segments souple" id="segMetrique"></div>
+      <div id="blocSuite">
+        <h2>Séquence <small id="litSuite"></small></h2>
+        <p class="notice">Jusqu'à quatre mesures qui s'enchaînent. Touche une métrique
+          ci-dessus puis « ajouter » ; sans séquence, la métrique choisie tourne seule.</p>
+        <div class="segments souple" id="zoneSuite"></div>
+      </div>
+    </div>
+    <div id="blocMesureLibre" hidden>
+      <h2>Mesure</h2>
+      <div class="reglette" id="regTemps"></div>
+      <h2>Division</h2>
+      <div class="segments souple" id="segDivision"></div>
+    </div>
+
     <div id="blocPrets" hidden>
       <div class="segments souple">
         <button id="btnClaveHasard">clave au hasard</button>
@@ -458,23 +472,6 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
       <div id="zoneNomClave" hidden></div>
       <div class="segments souple" id="zoneClavesGardees"></div>
     </div>
-    <div id="blocMetrique">
-      <h2 id="titreMetrique">Métrique</h2>
-      <div class="segments souple" id="segMetrique"></div>
-      <h2>Séquence <small id="litSuite"></small></h2>
-      <p class="notice">Jusqu'à quatre mesures qui s'enchaînent. Touche une métrique
-        ci-dessus puis « ajouter » ; sans séquence, la métrique choisie tourne seule.</p>
-      <div class="segments souple" id="zoneSuite"></div>
-    </div>
-    <div id="blocMesureLibre" hidden>
-      <h2>Mesure</h2>
-      <div class="reglette" id="regTemps"></div>
-      <h2>Division</h2>
-      <div class="segments souple" id="segDivision"></div>
-    </div>
-    <h1 class="section">Chances</h1>
-    <p class="notice">Chance qu'un coup soit joué. La basse suit le kick.</p>
-    <div class="mixer" id="zoneProba"></div>
     <div id="blocClave" hidden>
       <h2>Clave <small id="litClave"></small></h2>
       <div id="zoneClave"></div>
@@ -487,31 +484,47 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
       <h2>Pistes euclidiennes</h2>
       <div id="zonePistes"></div>
     </div>
-    <h2>Balancement</h2>
-    <div class="segments souple" id="segSwing"></div>
+
+    <div id="blocSwing">
+      <h2>Balancement</h2>
+      <div class="segments souple" id="segSwing"></div>
+    </div>
     <div id="blocShaker">
       <h2>Débit — croches</h2>
       <div class="segments souple" id="segShaker"></div>
     </div>
-    <h2>Débit — doubles</h2>
-    <div class="segments souple" id="segShaker2"></div>
+    <div id="blocShaker2">
+      <h2>Débit — doubles</h2>
+      <div class="segments souple" id="segShaker2"></div>
+    </div>
 
-    <h1 class="section">Mixage</h1>
-    <div class="mixer" id="zoneMix"></div>
+    <div id="blocMixage">
+      <h1 class="section">Mixage</h1>
+      <div class="mixer" id="zoneMix"></div>
+    </div>
+    <div id="blocChances">
+      <h1 class="section">Chances</h1>
+      <p class="notice">Chance qu'un coup soit joué. La basse suit le kick.</p>
+      <div class="mixer" id="zoneProba"></div>
+    </div>
 
-    <h1 class="section">Jeu</h1>
-    <h2>Instrument</h2>
-    <div id="zoneTimbresJam"></div>
-    <h2>Basse</h2>
-    <div class="segments souple" id="segMarche"></div>
-    <h2>Accords</h2>
-    <div class="segments souple" id="segAccords"></div>
-    <h2>Accompagnement</h2>
-    <div class="segments souple" id="segAccomp"></div>
-    <h2>Départ</h2>
-    <div class="segments souple" id="segDecompte"></div>
-    <h2>Ce qu'on voit</h2>
-    <div class="segments souple" id="segAffichage"></div>
+    <div id="blocJeu">
+      <h1 class="section">Jeu</h1>
+      <h2>Instrument</h2>
+      <div id="zoneTimbresJam"></div>
+      <h2>Basse</h2>
+      <div class="segments souple" id="segMarche"></div>
+      <h2>Accords</h2>
+      <div class="segments souple" id="segAccords"></div>
+      <h2>Accompagnement</h2>
+      <div class="segments souple" id="segAccomp"></div>
+      <h2>Départ</h2>
+      <div class="segments souple" id="segDecompte"></div>
+      <div id="blocAffichage">
+        <h2>Ce qu'on voit</h2>
+        <div class="segments souple" id="segAffichage"></div>
+      </div>
+    </div>
   </div>
 
   <div id="reglagesCtx" hidden>
@@ -2536,7 +2549,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.9';
+const VERSION_APP = '2.0';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4765,8 +4778,6 @@ function construireJam(){
   construirePistes();
   construireClave();
   construireMix();
-  const zc = $('blocClave');
-  if(zc) zc.hidden = jam.rythme === 'euclidien';
   const nc = $('noticeClave'); if(nc) nc.hidden = !estPerso();
   /* ⚠️ La métrique et la durée d'accord restent réglables en clave personnelle :
      la métrique y sert de point de départ à la clave, qu'on remanie ensuite. */
@@ -4779,7 +4790,6 @@ function construireJam(){
   const zp = $('blocParMesure'); if(zp) zp.hidden = false;
   seg('segSwing', 'swing', [[.5,'droit'],[.58,'léger'],[.66,'ternaire']]);
   // en euclidien le charleston a sa propre piste : ce réglage n'y a pas de sens
-  const zs = $('blocShaker'); if(zs) zs.hidden = jam.rythme === 'euclidien';
   seg('segShaker', 'shaker', [[true,'charleston'],[false,'sans']]);
   seg('segShaker2', 'shaker2', [[true,'shaker'],[false,'sans']]);
   seg('segDecompte', 'decompte', [[true,'avec décompte'],[false,'départ direct']]);
@@ -4789,8 +4799,7 @@ function construireJam(){
   /* La métrique écrite ne sert qu'à la rythmique classique ; ailleurs il compose
      sa mesure avec le nombre de temps et la division. */
   const libre = jam.rythme !== 'clave';
-  const bml = $('blocMesureLibre'); if(bml) bml.hidden = !libre;
-  const bm2 = $('blocMetrique'); if(bm2) bm2.hidden = libre && jam.rythme === 'euclidien';
+  // (la visibilité est décidée par ordonnerReglages, appelé en fin de construction)
   const rt = $('regTemps');
   if(rt){
     rt.innerHTML = '';
@@ -4802,41 +4811,9 @@ function construireJam(){
     plus.onclick = () => { jam.temps = Math.min(32, jam.temps + 1); construireJam(); if(jam.actif) relancerJam(); };
     rt.appendChild(moins); rt.appendChild(lu); rt.appendChild(plus);
   }
-  /* Practice reprend en tête le tempo et le régime : c'est là qu'on les règle,
-     avant d'écrire la grille. */
-  const cP = $('curTempoP');
-  if(cP){ cP.value = jam.tempo; $('litTempoP').textContent = jam.tempo; }
-  const zr = $('segRythmeP');
-  if(zr){
-    zr.innerHTML = '';
-    [['clave','rythmique classique'],['euclidien','euclidien'],['perso','clave perso']]
-      .forEach(([val, nom]) => {
-        const b = document.createElement('button');
-        b.textContent = nom;
-        if(jam.rythme === val) b.classList.add('on');
-        b.onclick = () => { jam.rythme = val; construireJam(); construireGrille();
-                            if(jam.actif) relancerJam(); };
-        zr.appendChild(b);
-      });
-  }
-  /* En euclidien la métrique ne se choisit pas mesure par mesure : on dit
-     seulement tous les combien l'accord change. */
-  const bf = $('blocFreqP'); if(bf) bf.hidden = jam.rythme !== 'euclidien';
-  const zFreq = $('segFreqP');
-  if(zFreq){
-    zFreq.innerHTML = '';
-    [[1,'chaque mesure'],[2,'2 mesures'],[4,'4 mesures']].forEach(([val, nom]) => {
-      const b = document.createElement('button');
-      b.textContent = nom;
-      if(jam.parMesure === val) b.classList.add('on');
-      b.onclick = () => { jam.parMesure = val; construireJam(); if(jam.actif) relancerJam(); };
-      zFreq.appendChild(b);
-    });
-  }
   construireSuite();
   construireProba();
-  const zp2 = $('blocPrets');
-  if(zp2) zp2.hidden = !estPerso();
+  ordonnerReglages();
   const zg = $('zoneClavesGardees');
   if(zg){
     zg.innerHTML = '';
@@ -4994,6 +4971,50 @@ function nbAccordsVoulu(m){
   return Math.max(1, n);
 }
 
+/* ⭐⭐ L'ORDRE DES RÉGLAGES, décidé par le mode et le régime. On DÉPLACE les
+   blocs plutôt que de les dupliquer : `appendChild` réinsère un nœud existant,
+   donc l'ordre d'appel devient l'ordre à l'écran. Ce qui n'a pas de sens dans un
+   régime donné est simplement masqué. */
+const PLANS = {
+  // Terrain : on tire la grille, l'harmonie a donc sa place
+  jam: {
+    clave:     ['blocHarmonie','blocTitreRythme','blocTempoJam','blocRythmeJam','blocMetrique',
+                'blocSwing','blocShaker','blocShaker2','blocMixage','blocChances','blocJeu'],
+    euclidien: ['blocHarmonie','blocTitreRythme','blocTempoJam','blocRythmeJam','blocMesureLibre',
+                'blocDensite','blocSwing','blocShaker2','blocMixage','blocChances','blocJeu'],
+    perso:     ['blocHarmonie','blocTitreRythme','blocTempoJam','blocRythmeJam','blocMesureLibre',
+                'blocPrets','blocClave','blocSwing','blocShaker','blocShaker2',
+                'blocMixage','blocChances','blocJeu'],
+  },
+  /* Practice : sa grille commande. Ni séquence, ni métrique globale, ni fréquence
+     de changement d'accord — tout cela se lit sur la grille elle-même. */
+  prat: {
+    clave:     ['blocTitreRythme','blocTempoJam','blocRythmeJam','blocGrille',
+                'blocSwing','blocShaker','blocShaker2','blocMixage','blocChances','blocJeu'],
+    euclidien: ['blocTitreRythme','blocTempoJam','blocRythmeJam','blocMesureLibre','blocDensite',
+                'blocGrille','blocSwing','blocShaker2','blocMixage','blocChances','blocJeu'],
+    perso:     ['blocTitreRythme','blocTempoJam','blocRythmeJam','blocPrets','blocClave',
+                'blocGrille','blocSwing','blocShaker','blocShaker2',
+                'blocMixage','blocChances','blocJeu'],
+  },
+};
+
+function ordonnerReglages(){
+  const z = $('reglagesJam'); if(!z) return;
+  const plan = (PLANS[cfg.app === 'prat' ? 'prat' : 'jam'] || {})[jam.rythme];
+  if(!plan) return;
+  const tous = ['blocHarmonie','blocTitreRythme','blocTempoJam','blocRythmeJam','blocGrille',
+                'blocMetrique','blocMesureLibre','blocPrets','blocClave','blocDensite',
+                'blocSwing','blocShaker','blocShaker2','blocMixage','blocChances','blocJeu'];
+  tous.forEach(id => { const e = $(id); if(e) e.hidden = !plan.includes(id); });
+  plan.forEach(id => { const e = $(id); if(e) z.appendChild(e); });
+  // les blocs sans emploi passent à la fin : invisibles, mais le panneau reste net
+  tous.filter(id => !plan.includes(id))
+      .forEach(id => { const e = $(id); if(e) z.appendChild(e); });
+  // en Practice l'accord est écrit : on ne cache rien, le réglage d'affichage part
+  const aff = $('blocAffichage'); if(aff) aff.hidden = cfg.app === 'prat';
+}
+
 function construireGrille(){
   const z = $('zoneGrille'); if(!z) return;
   z.innerHTML = '';
@@ -5110,6 +5131,9 @@ function construireEdition(){
 }
 
 function construireSuite(){
+  const bs = $('blocSuite');
+  // ⚠️ pas de séquence en Practice : chaque mesure de la grille porte sa métrique
+  if(bs) bs.hidden = cfg.app === 'prat';
   const z = $('zoneSuite'); if(!z) return;
   z.innerHTML = '';
   const lu = $('litSuite');
@@ -5268,7 +5292,6 @@ function ouvrirMode(app){
   $('reglagesCtx').hidden = app !== 'ctx';
   // ⭐ Practice partage tous les réglages du Terrain, plus son éditeur de grille
   $('reglagesJam').hidden = app !== 'jam' && app !== 'prat';
-  $('reglagesPrat').hidden = app !== 'prat';
   $('reglagesRecon').hidden = app !== 'recon';
   $('blocLongueur').hidden = app !== 'recon';
   $('titreMode').textContent = app === 'ctx' ? 'Boussole' : app === 'jam' ? 'Terrain'
@@ -5280,13 +5303,7 @@ function ouvrirMode(app){
      ni du barème : il n'y a pas de réponse à juger. */
   const bo = $('blocOutils'); if(bo) bo.hidden = app === 'jam' || app === 'prat';
   const zb = $('zoneBilan'); if(zb) zb.hidden = app === 'jam' || app === 'prat';
-  /* ⚠️ En Practice on ÉCRIT la grille : le niveau, les familles, la fréquence de
-     changement d'accord et le choix boucle/flux ne veulent plus rien dire. Le
-     tempo et le régime y sont repris en tête de l'éditeur. */
-  const enPrat = app === 'prat';
-  [['blocNiveauJam', enPrat], ['blocParMesure', enPrat], ['blocBoucle', enPrat],
-   ['blocTempoJam', enPrat], ['blocRythmeJam', enPrat]]
-    .forEach(([id, cache]) => { const e = $(id); if(e) e.hidden = cache; });
+  // le rangement des réglages dépend du mode ET du régime : voir ordonnerReglages()
   if(app === 'ctx') refletCtx();
   majApercu(); majTableauReglages(); sauverCfg();
   $('tiroir').classList.add('ouvert');
@@ -5383,12 +5400,6 @@ if(curT) curT.oninput = () => {
 };
 $('btnStop').onclick = () => { arreterJam(); $('tiroir').classList.add('ouvert'); };
 const lv = $('litVersion'); if(lv) lv.textContent = 'version ' + VERSION_APP;
-const curTP = $('curTempoP');
-if(curTP) curTP.oninput = () => {
-  jam.tempo = +curTP.value; $('litTempoP').textContent = jam.tempo;
-  const c2 = $('curTempo'); if(c2) c2.value = jam.tempo;
-  const l2 = $('litTempo'); if(l2) l2.textContent = jam.tempo;
-};
 $('btnClaveGarder').onclick = () => {
   demanderNom('Nom de la clave', nom => { garderClave(nom); construireJam(); });
 };
