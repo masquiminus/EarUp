@@ -2410,7 +2410,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.1';
+const VERSION_APP = '1.2';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3765,8 +3765,16 @@ function jouerTonalite(tonaliteVoulue){
   const modeT = (t === laTonalite() && chaineActive()) ? etatPro.mode : ctx2.mode;
   const q = QUALITES.find(x => x.id === (modeT === 'mineur' ? 'min' : 'maj'));
   const c = contexte(), t0 = c.currentTime + .05;
-  q.int.map(i => 48 + ((t.pc + i) % 12)).sort((a,b) => a-b)
-       .forEach((n, k) => voix(cfg.timbre, n, t0 + k * .02, 4.2, .13));
+  /* ⚠️ La nappe doit sonner avec le timbre CHOISI, donc passer par les mêmes
+     règles que les accords : les saxes n'ont pas de banque à leur nom, et sans
+     `banqueDeVoix` elle retombait en synthèse. */
+  const tb = TIMBRES.find(x => x.id === cfg.timbre) || TIMBRES[0];
+  let notes = q.int.map(i => 48 + ((t.pc + i) % 12)).sort((a, b) => a - b);
+  while(Math.max(...notes) > tb.ambitus[1]) notes = notes.map(x => x - 12);
+  while(Math.min(...notes) < tb.ambitus[0]) notes = notes.map(x => x + 12);
+  if(tb.pupitres) notes = respecterPupitres(notes, tb.pupitres);
+  notes.forEach((n, k) => voix(cfg.timbre, n, t0 + k * .02, 4.2, .13,
+                               banqueDeVoix(tb, k, notes.length, n)));
   /* ⚠️ Le bandeau reste MUET pendant une session : nommer la tonalité, c'est
      donner la réponse. On ne l'affiche qu'à la prévisualisation depuis les
      réglages, quand une tonalité précise est demandée. */
