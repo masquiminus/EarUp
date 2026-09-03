@@ -153,6 +153,11 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
 .valeur.b{color:var(--ambre);background:var(--panneau-2)}
 h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   color:var(--ambre);margin:22px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--trait)}
+.mesureGrille{display:flex;align-items:center;gap:8px;margin:5px 0;padding:5px;
+  border-radius:9px;border:1px solid transparent}
+.mesureGrille.on{border-color:var(--trait);background:var(--panneau-2)}
+.mesureGrille b{min-width:96px;font-size:11px;letter-spacing:.06em;color:var(--texte-2)}
+.mesureGrille .segments{flex:1}
 .mixer{display:flex;gap:6px;justify-content:space-between;padding:8px 0}
 .voie{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1 1 0}
 .voie b{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--texte-2)}
@@ -382,6 +387,10 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     <b>Boussole</b>
     <small>Reconnaître les accords DANS une tonalité. On garde le nord — jusqu'à ce qu'on le perde.</small>
   </button>
+  <button class="carte" id="allerPrat">
+    <b>Practice</b>
+    <small>Sa propre grille, écrite à la main et jouée en boucle. On sait ce qu'on entend — reste à le jouer.</small>
+  </button>
   <button class="carte" id="allerJam">
     <b>Terrain</b>
     <small>Jouer par-dessus une grille qu'on ne voit pas. Batterie, tempo, métrique — et l'oreille pour seule partition.</small>
@@ -392,6 +401,17 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   <div class="moniteur" id="bancEtat">Touche un accord pour l'entendre</div>
   <h1 id="titreMode">Recon OP</h1>
   <div class="lot"><button id="btnAccueil">Changer de mode</button></div>
+  <div id="reglagesPrat" hidden>
+    <h1 class="section">Ma grille</h1>
+    <div id="zoneGrille"></div>
+    <div class="segments souple" id="cmdGrille"></div>
+    <div id="blocEditAccord" hidden>
+      <h2 id="titreEdit">Mesure 1</h2>
+      <div class="segments souple" id="zoneNotes"></div>
+      <div class="segments souple" id="zoneNatures"></div>
+    </div>
+  </div>
+
   <div id="reglagesJam" hidden>
     <h1 class="section">Harmonie</h1>
     <h2>Niveau</h2>
@@ -422,6 +442,10 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     <div id="blocMetrique">
       <h2 id="titreMetrique">Métrique</h2>
       <div class="segments souple" id="segMetrique"></div>
+      <h2>Séquence <small id="litSuite"></small></h2>
+      <p class="notice">Jusqu'à quatre mesures qui s'enchaînent. Touche une métrique
+        ci-dessus puis « ajouter » ; sans séquence, la métrique choisie tourne seule.</p>
+      <div class="segments souple" id="zoneSuite"></div>
     </div>
     <div id="blocMesureLibre" hidden>
       <h2>Mesure</h2>
@@ -2493,7 +2517,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.7';
+const VERSION_APP = '1.8';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3653,9 +3677,13 @@ function sauverCfg(){
         marche:jam.marche, timbre:jam.timbre, accomp:jam.accomp, decompte:jam.decompte,
         clave:jam.clave, claveDe:jam.claveDe,
         temps:jam.temps, division:jam.division, accords:jam.accords,
+        suite:jam.suite.slice(),
         mix:{...jam.mix}, proba:{...jam.proba},
         pistes:jam.pistes.map(p => ({...p})),
       },
+      // ⭐ sa grille de Practice, écrite à la main : elle doit survivre
+      grille:prat.mesures.map(m => ({metrique:m.metrique,
+        accords:m.accords.map(a => ({note:a.note, nature:a.nature}))})),
       claves:CLAVES_GARDEES,
     }));
   }catch(e){}
@@ -3699,6 +3727,8 @@ function chargerCfg(){
       if(Number.isInteger(j.temps) && j.temps >= 2 && j.temps <= 32) jam.temps = j.temps;
       if([2,4,8,16].includes(j.division)) jam.division = j.division;
       if(typeof j.accords === 'boolean') jam.accords = j.accords;
+      if(Array.isArray(j.suite))
+        jam.suite = j.suite.filter(x => METRIQUES.some(m => m.id === x)).slice(0, 4);
       ['mix','proba'].forEach(cle => {
         if(j[cle] && typeof j[cle] === 'object')
           Object.keys(jam[cle]).forEach(k => {
@@ -3712,6 +3742,15 @@ function chargerCfg(){
           return v && Number.isInteger(v.n) && Number.isInteger(v.pas)
                ? {id:p.id, n:v.n, pas:v.pas, rot:v.rot|0, proba:v.proba|0} : p;
         });
+    }
+    if(Array.isArray(l.grille) && l.grille.length){
+      const bon = l.grille.filter(m => m && METRIQUES.some(x => x.id === m.metrique)
+                                    && Array.isArray(m.accords) && m.accords.length);
+      if(bon.length) prat.mesures = bon.map(m => ({metrique:m.metrique,
+        accords:m.accords.map(a => ({
+          note: Number.isInteger(a.note) && a.note >= -1 && a.note < 12 ? a.note : -1,
+          nature: QUALITES.some(q => q.id === a.nature) ? a.nature : null}))}));
+      prat.edite = 0; prat.rang = 0;
     }
     if(l.ctx && typeof l.ctx === 'object'){
       if(Number.isInteger(l.ctx.tonique)) ctx2.tonique = ((l.ctx.tonique % 12) + 12) % 12;
@@ -4114,7 +4153,22 @@ const CHAABI = {
   caisse:  [3,8,15,20],
 };
 
-const laMetrique = () => METRIQUES.find(m => m.id === jam.metrique) || METRIQUES[0];
+/* ⭐ UNE SÉQUENCE DE MESURES : jusqu'à quatre métriques qui s'enchaînent, pour
+   atteindre d'un geste les mesures composées — 4/4 + 7/8 + 3/8 + 2/4, ou trois
+   7/4 dont le dernier renverse sa découpe. `jam.suite` les porte ; `jam.rangSuite`
+   dit où l'on en est. Une seule entrée = comportement d'avant. */
+const enPratique = () => cfg.app === 'prat';
+const laMetrique = () => {
+  /* ⚠️ En Practice, c'est LA GRILLE qui commande : chaque mesure porte sa propre
+     métrique, et la séquence du Terrain ne s'applique pas. */
+  if(enPratique() && prat.mesures.length){
+    const m = prat.mesures[(jam.rangSuite | 0) % prat.mesures.length];
+    return METRIQUES.find(x => x.id === m.metrique) || METRIQUES[0];
+  }
+  const l = jam.suite && jam.suite.length ? jam.suite : [jam.metrique];
+  const id = l[(jam.rangSuite | 0) % l.length];
+  return METRIQUES.find(m => m.id === id) || METRIQUES[0];
+};
 /* Sa clave à lui : une suite de valeurs, chacune portant son attaque. On part de
    celle de la métrique, il la remanie ensuite. */
 function claveCourante(){
@@ -4292,11 +4346,51 @@ const FAMILLES_JAM = [
   {id:'demidim',nom:'Demi-dim', ids:['m7b5','m9b5','m11b5']},
 ];
 
+/* ============================================================
+   MODE 4 — « Practice » : sa PROPRE grille, écrite à la main, jouée en boucle.
+   Tout le métronome du Terrain, mais on sait ce qu'on entend : ce n'est plus de
+   la reconnaissance, c'est du travail sur une grille connue.
+   ============================================================ */
+const prat = {
+  /* Une mesure = une métrique et ses accords. En clave personnelle il peut y
+     avoir PLUSIEURS accords par mesure, un par pastille ◆ ; ailleurs un seul.
+     Un accord est {note, nature} ; note === -1 signifie « % », le même que le
+     précédent — la reconduction, qu'on écrit d'un signe sur une grille. */
+  mesures: [
+    {metrique:'4/4', accords:[{note:0, nature:'maj7'}]},
+    {metrique:'4/4', accords:[{note:-1, nature:null}]},
+    {metrique:'4/4', accords:[{note:5, nature:'m7'}]},
+    {metrique:'4/4', accords:[{note:7, nature:'7'}]},
+  ],
+  edite: 0, rang: 0, // quelle mesure et quel accord on modifie
+  choixNote: null,   // saisie en deux gestes, comme dans les questions
+};
+
+/* Résout les « % » : chaque accord reçoit celui qu'il reconduit. */
+function grillePratique(){
+  const out = [];
+  let dernier = null;
+  prat.mesures.forEach((m, im) => {
+    (m.accords.length ? m.accords : [{note:-1, nature:null}]).forEach((a, ia) => {
+      const vrai = (a.note >= 0 && a.nature) ? a : dernier;
+      out.push({mesure:im, rang:ia, accord: vrai, reconduit: !(a.note >= 0 && a.nature)});
+      if(a.note >= 0 && a.nature) dernier = a;
+    });
+  });
+  // si la grille commence par un « % », il reconduit le dernier accord écrit
+  if(out.length && !out[0].accord){
+    const p = [...prat.mesures].reverse().flatMap(m => m.accords)
+                .find(a => a.note >= 0 && a.nature);
+    out.forEach(x => { if(!x.accord) x.accord = p; else return; });
+  }
+  return out;
+}
+
 const jam = {
   actif:false, tempo:120, metrique:'4/4', parMesure:1,
   rythme:'clave', swing:.5, shaker:true,
   clave:null, claveDe:null, decompte:true, accomp:'pose', rangSuivant:0, attente:0, shaker2:false,
-  temps:4, division:4, accords:true,
+  temps:4, division:4, accords:true, suite:[], rangSuite:0,
   proba:{grosse:100, caisse:100, charley:100, ride:100, shaker:100},
   mix:{grosse:1, caisse:1, charley:1, ride:1, shaker:1, accords:1, basse:.7},
   pistes:[{id:'grosse', n:4, pas:16, rot:0, proba:100},
@@ -4366,6 +4460,12 @@ function frappe(quoi, t, force){
 /* La grille : on demande à la grammaire une suite d'accords, et on l'étale sur
    les mesures. En boucle, on fige seize mesures ; sinon on réalimente sans fin. */
 function grilleJam(nb){
+  /* ⭐ En Practice on ne tire rien : on joue SA grille, telle qu'il l'a écrite. */
+  if(enPratique()){
+    return grillePratique().filter(x => x.accord).map(x => ({
+      pc: x.accord.note, mode: 'majeur', e: [0, x.accord.nature, ''],
+    }));
+  }
   /* ⭐ Les niveaux sont ceux de Boussole. En dessous de Professionnel il n'y a
      pas de grammaire de cadences : on tire dans le pool du niveau, en restant
      dans la tonalité — c'est exactement ce que fait le mode 2 à ces niveaux. */
@@ -4482,14 +4582,23 @@ function pasJam(){
         jam.courant = e;
         auMoment(t, majAfficheJam);
       }
-      if(!jam.etude) jam.mesure++;
+      if(!jam.etude){
+        jam.mesure++;
+        // on passe à la métrique suivante de la séquence
+        const nMes = enPratique() ? prat.mesures.length
+                   : (jam.suite && jam.suite.length > 1 ? jam.suite.length : 0);
+        if(nMes > 1) jam.rangSuite = (jam.rangSuite + 1) % nMes;
+      }
       if(!jam.etude && !jam.boucle && jam.rang > jam.grille.length - 6)
         jam.grille = jam.grille.concat(grilleJam(8));
     }
     // le pouls suit lui aussi le son, pas le calcul
     const pas = jam.index;
     auMoment(t, () => { jam.pasVu = pas; majPouls(); });
+    /* ⚠️ Dans une séquence, chaque mesure a sa propre longueur : l'index doit
+       repartir de zéro à chaque changement, sinon les pas se décalent. */
     jam.index++;
+    if(jam.index % n === 0 && (enPratique() || (jam.suite && jam.suite.length > 1))) jam.index = 0;
     jam.prochain += duree;
   }
 }
@@ -4577,6 +4686,14 @@ function majAfficheJam(){
   const e = jam.courant;
   const q = QUALITES.find(x => x.id === e.e[1]);
   const t = tonalite(e.pc, e.mode);
+  /* ⭐ En Practice, la grille est connue : on affiche l'accord ENTIER. C'est tout
+     l'écart avec le Terrain, où le voir ruinerait l'exercice. */
+  if(enPratique()){
+    const nom = NOTES_GRILLE[((e.pc % 12) + 12) % 12] + (q && q.id !== 'maj' ? q.sym : '');
+    el.textContent = nom;
+    majPouls();
+    return;
+  }
   if(jam.affichage === 'basse')
     el.textContent = nomUsuel(t.pc + e.e[0], NOMS_DEGRE[e.e[0]], t);
   else if(jam.affichage === 'nature')
@@ -4666,6 +4783,7 @@ function construireJam(){
     plus.onclick = () => { jam.temps = Math.min(32, jam.temps + 1); construireJam(); if(jam.actif) relancerJam(); };
     rt.appendChild(moins); rt.appendChild(lu); rt.appendChild(plus);
   }
+  construireSuite();
   construireProba();
   const zp2 = $('blocPrets');
   if(zp2) zp2.hidden = !estPerso();
@@ -4808,6 +4926,157 @@ function construireClave(){
 /* Six faders verticaux : c'est le geste qu'on attend d'une table de mixage,
    et il se lit d'un coup d'œil. */
 /* Le second mixer : non plus le volume, mais la CHANCE qu'un coup soit joué. */
+/* La séquence : on montre les mesures dans l'ordre, chacune retirable d'un
+   toucher, plus un bouton d'ajout tant qu'on est sous quatre. */
+/* ⭐ L'ÉDITEUR DE GRILLE. Une ligne par mesure : sa métrique, puis ses accords —
+   un seul d'ordinaire, autant que de pastilles ◆ en clave personnelle. On touche
+   un accord pour le modifier, en deux gestes comme dans les questions : la note,
+   puis la nature. La treizième note est « % », qui reconduit le précédent. */
+const NOTES_GRILLE = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
+
+function nbAccordsVoulu(m){
+  // en clave personnelle, autant d'accords que de pastilles ◆ dans la mesure
+  if(jam.rythme !== 'perso') return 1;
+  const memo = jam.metrique;
+  jam.metrique = m.metrique;
+  const n = changementsJam().length;
+  jam.metrique = memo;
+  return Math.max(1, n);
+}
+
+function construireGrille(){
+  const z = $('zoneGrille'); if(!z) return;
+  z.innerHTML = '';
+  prat.mesures.forEach((m, i) => {
+    // la clave peut avoir changé : on ajuste le nombre d'accords de la mesure
+    const voulu = nbAccordsVoulu(m);
+    while(m.accords.length < voulu) m.accords.push({note:-1, nature:null});
+    while(m.accords.length > voulu) m.accords.pop();
+
+    const l = document.createElement('div');
+    l.className = 'mesureGrille' + (i === prat.edite ? ' on' : '');
+    const t = document.createElement('b');
+    const met = METRIQUES.find(x => x.id === m.metrique) || {nom:m.metrique};
+    t.textContent = (i + 1) + '. ' + met.nom;
+    t.onclick = () => {
+      // toucher la métrique la fait tourner dans la liste
+      const k = METRIQUES.findIndex(x => x.id === m.metrique);
+      m.metrique = METRIQUES[(k + 1) % METRIQUES.length].id;
+      construireGrille(); if(jam.actif) relancerJam();
+    };
+    l.appendChild(t);
+    const r = document.createElement('div');
+    r.className = 'segments souple';
+    m.accords.forEach((a, ia) => {
+      const b = document.createElement('button');
+      const q = a.nature ? QUALITES.find(x => x.id === a.nature) : null;
+      b.textContent = (a.note >= 0 && q)
+        ? NOTES_GRILLE[a.note] + (q.id === 'maj' ? '' : q.sym) : '%';
+      b.className = 'valeur' + (prat.edite === i && prat.rang === ia ? ' on' : '');
+      b.onclick = () => {
+        prat.edite = i; prat.rang = ia; prat.choixNote = null;
+        construireGrille(); construireEdition();
+      };
+      r.appendChild(b);
+    });
+    l.appendChild(r);
+    z.appendChild(l);
+  });
+
+  const c = $('cmdGrille');
+  c.innerHTML = '';
+  const moins = document.createElement('button');
+  moins.textContent = '− une mesure';
+  moins.onclick = () => {
+    if(prat.mesures.length > 1) prat.mesures.pop();
+    prat.edite = Math.min(prat.edite, prat.mesures.length - 1);
+    construireGrille(); if(jam.actif) relancerJam();
+  };
+  const plus = document.createElement('button');
+  plus.textContent = '+ une mesure';
+  plus.onclick = () => {
+    const d = prat.mesures[prat.mesures.length - 1];
+    prat.mesures.push({metrique: d ? d.metrique : '4/4', accords:[{note:-1, nature:null}]});
+    construireGrille(); if(jam.actif) relancerJam();
+  };
+  c.appendChild(moins); c.appendChild(plus);
+  construireEdition();
+}
+
+/* La saisie d'un accord, en deux gestes : la note d'abord, puis la nature. */
+function construireEdition(){
+  const bloc = $('blocEditAccord'); if(!bloc) return;
+  const m = prat.mesures[prat.edite];
+  const a = m && m.accords[prat.rang | 0];
+  if(!a){ bloc.hidden = true; return; }
+  bloc.hidden = false;
+  const met = METRIQUES.find(x => x.id === m.metrique) || {nom:m.metrique};
+  $('titreEdit').textContent = `Mesure ${prat.edite + 1} · ${met.nom}`
+    + (m.accords.length > 1 ? ` · accord ${(prat.rang | 0) + 1}` : '');
+
+  const zn = $('zoneNotes');
+  zn.innerHTML = '';
+  NOTES_GRILLE.forEach((nom, pc) => {
+    const b = document.createElement('button');
+    b.textContent = nom;
+    if(prat.choixNote === pc || (prat.choixNote === null && a.note === pc)) b.classList.add('on');
+    b.onclick = () => { prat.choixNote = pc; construireEdition(); };
+    zn.appendChild(b);
+  });
+  const pc = document.createElement('button');
+  pc.innerHTML = '%<small>même accord</small>';
+  pc.className = 'valeur' + (a.note < 0 ? ' on' : '');
+  pc.onclick = () => {
+    a.note = -1; a.nature = null; prat.choixNote = null;
+    construireGrille(); if(jam.actif) relancerJam();
+  };
+  zn.appendChild(pc);
+
+  const zq = $('zoneNatures');
+  zq.innerHTML = '';
+  QUALITES.forEach(q => {
+    const b = document.createElement('button');
+    b.textContent = q.id === 'maj' ? 'maj' : q.sym;
+    if(a.nature === q.id && prat.choixNote === null) b.classList.add('on');
+    b.onclick = () => {
+      const note = prat.choixNote !== null ? prat.choixNote : (a.note >= 0 ? a.note : 0);
+      a.note = note; a.nature = q.id; prat.choixNote = null;
+      construireGrille(); if(jam.actif) relancerJam();
+    };
+    zq.appendChild(b);
+  });
+}
+
+function construireSuite(){
+  const z = $('zoneSuite'); if(!z) return;
+  z.innerHTML = '';
+  const lu = $('litSuite');
+  if(lu) lu.textContent = jam.suite.length
+    ? jam.suite.map(id => (METRIQUES.find(m => m.id === id) || {}).nom).join(' → ')
+    : '';
+  jam.suite.forEach((id, i) => {
+    const m = METRIQUES.find(x => x.id === id) || {nom:id};
+    const b = document.createElement('button');
+    b.innerHTML = `${i + 1}. ${m.nom}<small>retirer</small>`;
+    b.className = 'valeur';
+    b.onclick = () => { jam.suite.splice(i, 1); construireJam(); if(jam.actif) relancerJam(); };
+    z.appendChild(b);
+  });
+  if(jam.suite.length < 4){
+    const p = document.createElement('button');
+    const m = METRIQUES.find(x => x.id === jam.metrique) || METRIQUES[0];
+    p.textContent = '+ ' + m.nom;
+    p.onclick = () => { jam.suite.push(jam.metrique); construireJam(); if(jam.actif) relancerJam(); };
+    z.appendChild(p);
+  }
+  if(jam.suite.length){
+    const v = document.createElement('button');
+    v.textContent = 'vider';
+    v.onclick = () => { jam.suite = []; construireJam(); if(jam.actif) relancerJam(); };
+    z.appendChild(v);
+  }
+}
+
 function construireProba(){
   const z = $('zoneProba'); if(!z) return;
   z.innerHTML = '';
@@ -4911,6 +5180,7 @@ function decompteJam(apres){
 function lancerJam(){
   jam.grille = grilleJam(jam.boucle ? 16 : 24);
   jam.index = 0; jam.pasVu = 0; jam.mesure = 0; jam.rang = 0; jam.rangSuivant = 0; jam.attente = 0;
+  jam.rangSuite = 0;
   jam.etude = false; jam.notesCourantes = null; jam.entreeCourante = null;
   const partir = () => {
     jam.actif = true;
@@ -4934,17 +5204,20 @@ function ouvrirMode(app){
   cfg.app = app;
   $('accueil').hidden = true;
   $('reglagesCtx').hidden = app !== 'ctx';
-  $('reglagesJam').hidden = app !== 'jam';
+  // ⭐ Practice partage tous les réglages du Terrain, plus son éditeur de grille
+  $('reglagesJam').hidden = app !== 'jam' && app !== 'prat';
+  $('reglagesPrat').hidden = app !== 'prat';
   $('reglagesRecon').hidden = app !== 'recon';
   $('blocLongueur').hidden = app !== 'recon';
-  $('titreMode').textContent = app === 'ctx' ? 'Boussole' : app === 'jam' ? 'Terrain' : 'Recon OP';
+  $('titreMode').textContent = app === 'ctx' ? 'Boussole' : app === 'jam' ? 'Terrain'
+                             : app === 'prat' ? 'Practice' : 'Recon OP';
   // ⭐ Pas de points ici : « il n'y a pas de mauvaises réponses, c'est fait pour jouer. »
-  if(app === 'jam'){ construireJam(); arreterJam(); }
+  if(app === 'jam' || app === 'prat'){ construireJam(); construireGrille(); arreterJam(); }
   majBoutonEtude();
   /* ⭐ Le Terrain n'a que faire du banc d'écoute, des scores, des sons de retour
      ni du barème : il n'y a pas de réponse à juger. */
-  const bo = $('blocOutils'); if(bo) bo.hidden = app === 'jam';
-  const zb = $('zoneBilan'); if(zb) zb.hidden = app === 'jam';
+  const bo = $('blocOutils'); if(bo) bo.hidden = app === 'jam' || app === 'prat';
+  const zb = $('zoneBilan'); if(zb) zb.hidden = app === 'jam' || app === 'prat';
   if(app === 'ctx') refletCtx();
   majApercu(); majTableauReglages(); sauverCfg();
   $('tiroir').classList.add('ouvert');
@@ -4953,6 +5226,7 @@ $('btnAccueil').onclick = () => { arreterJam(); $('accueil').hidden = false; };
 $('allerRecon').onclick = () => ouvrirMode('recon');
 $('allerCtx').onclick   = () => ouvrirMode('ctx');
 $('allerJam').onclick   = () => ouvrirMode('jam');
+$('allerPrat').onclick  = () => ouvrirMode('prat');
 /* ⭐ SA RÈGLE : on peut réentendre la tonalité de référence à volonté ; après
    une modulation, c'est la NOUVELLE tonalité que le bouton fait entendre. */
 $('btnRepere').onclick = () => jouerTonalite();
@@ -5017,7 +5291,7 @@ $('btnVider').onclick = () => {
 };
 $('btnDemarrer').onclick = () => {
   $('tiroir').classList.remove('ouvert');
-  if(cfg.app === 'jam'){
+  if(cfg.app === 'jam' || cfg.app === 'prat'){
     $('afficheJam').hidden = false;
     $('btnStop').hidden = false;
     $('btnRepere').hidden = true; $('btnPasser').hidden = true; $('btnModule').hidden = true;
