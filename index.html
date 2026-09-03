@@ -156,6 +156,7 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
 .mesureGrille{display:flex;align-items:center;gap:8px;margin:5px 0;padding:5px;
   border-radius:9px;border:1px solid transparent}
 .mesureGrille.on{border-color:var(--trait);background:var(--panneau-2)}
+.reglable{border:1px solid var(--trait);border-radius:6px;padding:2px 6px;color:var(--texte)}
 .mesureGrille b{min-width:96px;font-size:11px;letter-spacing:.06em;color:var(--texte-2)}
 .mesureGrille b small{display:block;font-size:10px;letter-spacing:.02em;color:var(--ambre);
   word-break:break-all;margin-top:2px}
@@ -482,6 +483,9 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     </div>
     <div id="blocDensite" hidden>
       <h2>Pistes euclidiennes</h2>
+      <div class="segments souple">
+        <button id="btnEuclidHasard">euclidien au hasard</button>
+      </div>
       <div id="zonePistes"></div>
     </div>
 
@@ -2315,7 +2319,8 @@ function voix(timbreId, midi, quand, duree, vol, banqueId){
        vaut QUE POUR LE TERRAIN, où l'on joue en place. Dans Recon OP et Boussole
        il produisait un « pop » à l'attaque, et l'exigence rythmique y est nulle :
        on y lit le fichier à l'instant demandé, sans rien avancer. */
-    const avance = cfg.app === 'jam' ? corpsSon(s.buffer) : 0;
+    // ⚠️ Practice joue en mesure comme le Terrain : le calage y vaut aussi.
+    const avance = (cfg.app === 'jam' || cfg.app === 'prat') ? corpsSon(s.buffer) : 0;
     const depart = quand - avance;
     if(depart >= c.currentTime) s.start(depart);
     else s.start(c.currentTime, c.currentTime - depart);   // trop tard : on rattrape
@@ -2383,7 +2388,7 @@ function banqueDeVoix(t, rang, total, midi){
 function jouer(notes, mode, basse){
   const c = contexte();
   // pas d'anticipation hors du Terrain : rien n'y est calé
-  const t0 = c.currentTime + (cfg.app === 'jam' ? .35 : .05);
+  const t0 = c.currentTime + ((cfg.app === 'jam' || cfg.app === 'prat') ? .35 : .05);
   const pas = mode === 'arpege' ? .34 : 0;
   const t = leTimbre();
   const total = basse != null ? notes.length - 1 : notes.length;
@@ -2558,7 +2563,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '2.2';
+const VERSION_APP = '2.5';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4305,6 +4310,40 @@ function rappelerClave(c){
   jam.claveDe = c.metrique;
 }
 
+/* ⭐ UN TIRAGE EUCLIDIEN AU HASARD, dans les deux modes. On ne tire pas quatre
+   pistes indépendamment — ça donne de la bouillie. On garde la LONGUEUR de la
+   mesure comptée, et on répartit les rôles : le kick clairsemé, la caisse en
+   réponse et décalée, le charleston dense, la ride épisodique. Les longueurs de
+   piste s'écartent parfois de la mesure pour engendrer des polyrythmies. */
+function euclidienAuHasard(){
+  /* ⭐ Chaque piste reçoit sa LONGUEUR PROPRE, indépendante de la mesure : c'est
+     de l'écart entre ces longueurs que naît la polyrythmie. On veille donc à ne
+     pas les rendre égales — et on garde le kick clairsemé, le charleston dense,
+     sinon le motif n'a plus ni bas ni haut. */
+  const entre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const POOL = [8, 9, 10, 12, 14, 16, 18];
+  const prises = [];
+  const longueur = () => {
+    const libres = POOL.filter(x => !prises.includes(x));
+    const v = auHasard(libres.length ? libres : POOL);
+    prises.push(v);
+    return v;
+  };
+  const densite = (p, bas, haut) => Math.max(1, Math.min(p - 1, entre(bas, haut)));
+  jam.pistes = jam.pistes.map(x => {
+    const p = longueur();
+    let n, proba = 100;
+    if(x.id === 'grosse')       n = densite(p, 2, Math.round(p * .35));
+    else if(x.id === 'caisse'){ n = densite(p, 1, Math.round(p * .25));
+                                proba = Math.random() < .3 ? entre(70, 95) : 100; }
+    else if(x.id === 'charley'){ n = densite(p, Math.round(p * .4), p - 1);
+                                 proba = entre(65, 100); }
+    else { n = Math.random() < .45 ? 0 : densite(p, 2, Math.round(p * .4));
+           proba = entre(55, 100); }
+    return {id:x.id, n, pas:p, rot: entre(0, p - 1), proba};
+  });
+}
+
 function claveAuHasard(){
   /* ⭐ On garde la LONGUEUR de la clave en cours et on ne retire que ses appuis :
      sans ça le bouton ramenait la mesure à celle de la métrique classique, alors
@@ -4442,7 +4481,7 @@ const jam = {
   actif:false, tempo:120, metrique:'4/4', parMesure:1,
   rythme:'clave', swing:.5, shaker:true,
   clave:null, claveDe:null, decompte:true, accomp:'pose', rangSuivant:0, attente:0, shaker2:false,
-  temps:4, division:4, accords:true, suite:[], rangSuite:0,
+  temps:4, division:4, accords:true, suite:[], rangSuite:0, pasAbsolu:0,
   proba:{grosse:100, caisse:100, charley:100, ride:100, shaker:100},
   mix:{grosse:1, caisse:1, charley:1, ride:1, shaker:1, accords:1, basse:.7},
   pistes:[{id:'grosse', n:4, pas:16, rot:0, proba:100},
@@ -4566,12 +4605,16 @@ function auMoment(t, quoi){
 
 function pasJam(){
   const c = contexte();
-  const n = mesureJam();
   const duree = (60 / jam.tempo) / 4;             // une double-croche
-  const motif = motifJam();
-  const changes = changementsJam();
-  const rappels = rappelsJam();
   while(jam.prochain < c.currentTime + .45){
+    /* ⚠️⚠️ TOUT SE RECALCULE À CHAQUE PAS. Dans une séquence, chaque mesure a sa
+       propre métrique : longueur, motif et changements en dépendent. Les figer
+       avant la boucle faisait jouer la mesure suivante avec les valeurs de la
+       précédente. */
+    const n = mesureJam();
+    const motif = motifJam();
+    const changes = changementsJam();
+    const rappels = rappelsJam();
     const i = jam.index % n;
     // le balancement décale la SECONDE croche de chaque temps, pas les doubles
     const swing = (i % 4 === 2) ? (jam.swing - .5) * duree * 4 : 0;
@@ -4596,8 +4639,14 @@ function pasJam(){
       if(jam.shaker && i % 2 === 0) frappe('charley', t, i === 0 ? .9 : .55);
 
     }else{
+      /* ⚠️⚠️ Chaque piste tourne sur SA PROPRE longueur, indépendante de la mesure :
+         c'est tout l'intérêt. On l'indexe donc sur un compteur ABSOLU, qui ne
+         repart jamais à zéro. `jam.index` est local à la mesure et servait ici
+         par erreur — les pistes se refermaient sur elle et le décalage promis
+         n'arrivait jamais. La mesure, elle, ne règle que la fréquence des
+         accords : une séquence de 16 pas sur une mesure de 5 doit glisser. */
       jam.pistes.forEach(p => {
-        if(pisteSonne(p, jam.index)) frappe(p.id, t, i === 0 ? 1 : .75);
+        if(pisteSonne(p, jam.pasAbsolu)) frappe(p.id, t, i === 0 ? 1 : .75);
       });
     }
 
@@ -4634,13 +4683,7 @@ function pasJam(){
         jam.courant = e;
         auMoment(t, majAfficheJam);
       }
-      if(!jam.etude){
-        jam.mesure++;
-        // on passe à la métrique suivante de la séquence
-        const nMes = enPratique() ? prat.mesures.length
-                   : (jam.suite && jam.suite.length > 1 ? jam.suite.length : 0);
-        if(nMes > 1) jam.rangSuite = (jam.rangSuite + 1) % nMes;
-      }
+      if(!jam.etude) jam.mesure++;
       if(!jam.etude && !jam.boucle && jam.rang > jam.grille.length - 6)
         jam.grille = jam.grille.concat(grilleJam(8));
     }
@@ -4649,8 +4692,19 @@ function pasJam(){
     auMoment(t, () => { jam.pasVu = pas; majPouls(); });
     /* ⚠️ Dans une séquence, chaque mesure a sa propre longueur : l'index doit
        repartir de zéro à chaque changement, sinon les pas se décalent. */
+    /* ⚠️⚠️ On ne passe à la mesure suivante qu'une fois celle-ci FINIE. L'avancer
+       sur le premier temps faisait lire la métrique de la mesure 2 dès la
+       mesure 1 : une grille 4/4 + 3/4 commençait à 3/4, et tout décalait. */
     jam.index++;
-    if(jam.index % n === 0 && (enPratique() || (jam.suite && jam.suite.length > 1))) jam.index = 0;
+    jam.pasAbsolu++;
+    if(jam.index >= n){
+      jam.index = 0;
+      if(!jam.etude){
+        const nMes = enPratique() ? prat.mesures.length
+                   : (jam.suite && jam.suite.length > 1 ? jam.suite.length : 0);
+        if(nMes > 1) jam.rangSuite = (jam.rangSuite + 1) % nMes;
+      }
+    }
     jam.prochain += duree;
   }
 }
@@ -5052,19 +5106,19 @@ function construireGrille(){
        deux mesures. En classique on la choisit ligne par ligne ; en euclidien
        elle vient des réglages ; en clave personnelle, de la clave elle-même. */
     if(jam.rythme === 'clave'){
-      t.textContent = (i + 1) + '. ' + met.nom;
+      /* En classique la métrique se règle ligne par ligne : elle est encadrée
+         pour dire qu'on peut la toucher. */
+      t.innerHTML = (i + 1) + '. <span class="reglable">' + met.nom + '</span>';
       t.onclick = () => {
         const k = METRIQUES.findIndex(x => x.id === m.metrique);
         m.metrique = METRIQUES[(k + 1) % METRIQUES.length].id;
         construireGrille(); if(jam.actif) relancerJam();
       };
-    }else if(jam.rythme === 'euclidien'){
-      t.textContent = (i + 1) + '. ' + jam.temps + '/' + jam.division;
     }else{
-      // la clave donne la mesure : on la montre, et les ◆ marquent les accords
-      const mo = motifJam(); const ch = changementsJam();
-      t.innerHTML = (i + 1) + '.<small>' +
-        mo.map((s, k) => ch.includes(k) ? '◆' : s ? '▪' : '·').join('') + '</small>';
+      /* ⚠️ Hors du classique la métrique ne se règle PAS par mesure : elle vient
+         des réglages en euclidien, de la clave en personnel. L'afficher ferait
+         croire qu'on peut la changer ici. */
+      t.textContent = (i + 1) + '.';
     }
     l.appendChild(t);
     const r = document.createElement('div');
@@ -5285,7 +5339,7 @@ function decompteJam(apres){
 
 function lancerJam(){
   jam.grille = grilleJam(jam.boucle ? 16 : 24);
-  jam.index = 0; jam.pasVu = 0; jam.mesure = 0; jam.rang = 0; jam.rangSuivant = 0; jam.attente = 0;
+  jam.index = 0; jam.pasAbsolu = 0; jam.pasVu = 0; jam.mesure = 0; jam.rang = 0; jam.rangSuivant = 0; jam.attente = 0;
   jam.rangSuite = 0;
   jam.etude = false; jam.notesCourantes = null; jam.entreeCourante = null;
   const partir = () => {
@@ -5446,6 +5500,10 @@ if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   });
 }
 
+$('btnEuclidHasard').onclick = () => {
+  euclidienAuHasard();
+  construireJam(); if(jam.actif) relancerJam();
+};
 $('btnClaveHasard').onclick = () => {
   jam.clave = claveAuHasard(); jam.claveDe = jam.metrique;
   construireJam(); if(jam.actif) relancerJam();
