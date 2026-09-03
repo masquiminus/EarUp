@@ -1776,7 +1776,10 @@ const TIMBRES = [
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
 
-  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55]},
+  /* ⚠️ Ses échantillons d'Iowa sont gravés bas — crête médiane à −10 dB —, donc
+     la contrebasse paraissait faible face aux saxes. On relève au TIRAGE, jamais
+     dans les fichiers : `gain` multiplie le volume de ce timbre. */
+  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:1.9},
 ];
 
 /* Registre de base : donné, ou déduit du pupitre le plus grave. */
@@ -2199,6 +2202,10 @@ function corpsSon(buf){
 }
 
 function voix(timbreId, midi, quand, duree, vol, banqueId){
+  // un timbre peut porter son propre gain, pour compenser des échantillons
+  // gravés plus bas que les autres sans toucher aux fichiers
+  const tG = TIMBRES.find(x => x.id === timbreId);
+  if(tG && tG.gain) vol *= tG.gain;
   const c = contexte();
   /* ⚠️ En SYNTHÈSE les graves sonnent nettement plus faibles — il prenait la
      deuxième note pour la basse. On compense sous le Sol3, jusqu'à +80 % dans
@@ -2475,7 +2482,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.5';
+const VERSION_APP = '1.6';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
