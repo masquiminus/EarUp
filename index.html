@@ -157,6 +157,8 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   border-radius:9px;border:1px solid transparent}
 .mesureGrille.on{border-color:var(--trait);background:var(--panneau-2)}
 .mesureGrille b{min-width:96px;font-size:11px;letter-spacing:.06em;color:var(--texte-2)}
+.mesureGrille b small{display:block;font-size:10px;letter-spacing:.02em;color:var(--ambre);
+  word-break:break-all;margin-top:2px}
 .mesureGrille .segments{flex:1}
 .mixer{display:flex;gap:6px;justify-content:space-between;padding:8px 0}
 .voie{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1 1 0}
@@ -402,6 +404,15 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   <h1 id="titreMode">Recon OP</h1>
   <div class="lot"><button id="btnAccueil">Changer de mode</button></div>
   <div id="reglagesPrat" hidden>
+    <h1 class="section">Rythme</h1>
+    <h2>Tempo <small id="litTempoP">120</small></h2>
+    <input type="range" id="curTempoP" min="40" max="240" step="2" value="120">
+    <div class="segments souple" id="segRythmeP"></div>
+    <div id="blocFreqP" hidden>
+      <h2>Changement d'accord</h2>
+      <div class="segments souple" id="segFreqP"></div>
+    </div>
+
     <h1 class="section">Ma grille</h1>
     <div id="zoneGrille"></div>
     <div class="segments souple" id="cmdGrille"></div>
@@ -413,9 +424,11 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   </div>
 
   <div id="reglagesJam" hidden>
-    <h1 class="section">Harmonie</h1>
-    <h2>Niveau</h2>
-    <div class="segments souple" id="segNiveauJam"></div>
+    <h1 class="section" id="titreHarmonie">Harmonie</h1>
+    <div id="blocNiveauJam">
+      <h2>Niveau</h2>
+      <div class="segments souple" id="segNiveauJam"></div>
+    </div>
     <div id="blocFamilles" hidden>
       <h2>Familles d'accords</h2>
       <div class="segments souple" id="segFamilles"></div>
@@ -424,13 +437,19 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
       <h2>Changement d'accord</h2>
       <div class="segments souple" id="segParMesure"></div>
     </div>
-    <h2>Grille</h2>
-    <div class="segments souple" id="segBoucle"></div>
+    <div id="blocBoucle">
+      <h2>Grille</h2>
+      <div class="segments souple" id="segBoucle"></div>
+    </div>
 
     <h1 class="section">Rythme</h1>
-    <h2>Tempo <small id="litTempo">120</small></h2>
-    <input type="range" id="curTempo" min="40" max="240" step="2" value="120">
-    <div class="segments souple" id="segRythme"></div>
+    <div id="blocTempoJam">
+      <h2>Tempo <small id="litTempo">120</small></h2>
+      <input type="range" id="curTempo" min="40" max="240" step="2" value="120">
+    </div>
+    <div id="blocRythmeJam">
+      <div class="segments souple" id="segRythme"></div>
+    </div>
     <div id="blocPrets" hidden>
       <div class="segments souple">
         <button id="btnClaveHasard">clave au hasard</button>
@@ -2517,7 +2536,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.8';
+const VERSION_APP = '1.9';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4783,6 +4802,37 @@ function construireJam(){
     plus.onclick = () => { jam.temps = Math.min(32, jam.temps + 1); construireJam(); if(jam.actif) relancerJam(); };
     rt.appendChild(moins); rt.appendChild(lu); rt.appendChild(plus);
   }
+  /* Practice reprend en tête le tempo et le régime : c'est là qu'on les règle,
+     avant d'écrire la grille. */
+  const cP = $('curTempoP');
+  if(cP){ cP.value = jam.tempo; $('litTempoP').textContent = jam.tempo; }
+  const zr = $('segRythmeP');
+  if(zr){
+    zr.innerHTML = '';
+    [['clave','rythmique classique'],['euclidien','euclidien'],['perso','clave perso']]
+      .forEach(([val, nom]) => {
+        const b = document.createElement('button');
+        b.textContent = nom;
+        if(jam.rythme === val) b.classList.add('on');
+        b.onclick = () => { jam.rythme = val; construireJam(); construireGrille();
+                            if(jam.actif) relancerJam(); };
+        zr.appendChild(b);
+      });
+  }
+  /* En euclidien la métrique ne se choisit pas mesure par mesure : on dit
+     seulement tous les combien l'accord change. */
+  const bf = $('blocFreqP'); if(bf) bf.hidden = jam.rythme !== 'euclidien';
+  const zFreq = $('segFreqP');
+  if(zFreq){
+    zFreq.innerHTML = '';
+    [[1,'chaque mesure'],[2,'2 mesures'],[4,'4 mesures']].forEach(([val, nom]) => {
+      const b = document.createElement('button');
+      b.textContent = nom;
+      if(jam.parMesure === val) b.classList.add('on');
+      b.onclick = () => { jam.parMesure = val; construireJam(); if(jam.actif) relancerJam(); };
+      zFreq.appendChild(b);
+    });
+  }
   construireSuite();
   construireProba();
   const zp2 = $('blocPrets');
@@ -4957,13 +5007,24 @@ function construireGrille(){
     l.className = 'mesureGrille' + (i === prat.edite ? ' on' : '');
     const t = document.createElement('b');
     const met = METRIQUES.find(x => x.id === m.metrique) || {nom:m.metrique};
-    t.textContent = (i + 1) + '. ' + met.nom;
-    t.onclick = () => {
-      // toucher la métrique la fait tourner dans la liste
-      const k = METRIQUES.findIndex(x => x.id === m.metrique);
-      m.metrique = METRIQUES[(k + 1) % METRIQUES.length].id;
-      construireGrille(); if(jam.actif) relancerJam();
-    };
+    /* ⚠️ Une mesure est UNE métrique, jamais une composition : 4/4 + 5/4, ce sont
+       deux mesures. En classique on la choisit ligne par ligne ; en euclidien
+       elle vient des réglages ; en clave personnelle, de la clave elle-même. */
+    if(jam.rythme === 'clave'){
+      t.textContent = (i + 1) + '. ' + met.nom;
+      t.onclick = () => {
+        const k = METRIQUES.findIndex(x => x.id === m.metrique);
+        m.metrique = METRIQUES[(k + 1) % METRIQUES.length].id;
+        construireGrille(); if(jam.actif) relancerJam();
+      };
+    }else if(jam.rythme === 'euclidien'){
+      t.textContent = (i + 1) + '. ' + jam.temps + '/' + jam.division;
+    }else{
+      // la clave donne la mesure : on la montre, et les ◆ marquent les accords
+      const mo = motifJam(); const ch = changementsJam();
+      t.innerHTML = (i + 1) + '.<small>' +
+        mo.map((s, k) => ch.includes(k) ? '◆' : s ? '▪' : '·').join('') + '</small>';
+    }
     l.appendChild(t);
     const r = document.createElement('div');
     r.className = 'segments souple';
@@ -4973,6 +5034,7 @@ function construireGrille(){
       b.textContent = (a.note >= 0 && q)
         ? NOTES_GRILLE[a.note] + (q.id === 'maj' ? '' : q.sym) : '%';
       b.className = 'valeur' + (prat.edite === i && prat.rang === ia ? ' on' : '');
+      if(m.accords.length > 1) b.innerHTML = b.textContent + '<small>◆' + (ia + 1) + '</small>';
       b.onclick = () => {
         prat.edite = i; prat.rang = ia; prat.choixNote = null;
         construireGrille(); construireEdition();
@@ -5218,6 +5280,13 @@ function ouvrirMode(app){
      ni du barème : il n'y a pas de réponse à juger. */
   const bo = $('blocOutils'); if(bo) bo.hidden = app === 'jam' || app === 'prat';
   const zb = $('zoneBilan'); if(zb) zb.hidden = app === 'jam' || app === 'prat';
+  /* ⚠️ En Practice on ÉCRIT la grille : le niveau, les familles, la fréquence de
+     changement d'accord et le choix boucle/flux ne veulent plus rien dire. Le
+     tempo et le régime y sont repris en tête de l'éditeur. */
+  const enPrat = app === 'prat';
+  [['blocNiveauJam', enPrat], ['blocParMesure', enPrat], ['blocBoucle', enPrat],
+   ['blocTempoJam', enPrat], ['blocRythmeJam', enPrat]]
+    .forEach(([id, cache]) => { const e = $(id); if(e) e.hidden = cache; });
   if(app === 'ctx') refletCtx();
   majApercu(); majTableauReglages(); sauverCfg();
   $('tiroir').classList.add('ouvert');
@@ -5314,6 +5383,12 @@ if(curT) curT.oninput = () => {
 };
 $('btnStop').onclick = () => { arreterJam(); $('tiroir').classList.add('ouvert'); };
 const lv = $('litVersion'); if(lv) lv.textContent = 'version ' + VERSION_APP;
+const curTP = $('curTempoP');
+if(curTP) curTP.oninput = () => {
+  jam.tempo = +curTP.value; $('litTempoP').textContent = jam.tempo;
+  const c2 = $('curTempo'); if(c2) c2.value = jam.tempo;
+  const l2 = $('litTempo'); if(l2) l2.textContent = jam.tempo;
+};
 $('btnClaveGarder').onclick = () => {
   demanderNom('Nom de la clave', nom => { garderClave(nom); construireJam(); });
 };
