@@ -423,6 +423,15 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
       <h2 id="titreMetrique">Métrique</h2>
       <div class="segments souple" id="segMetrique"></div>
     </div>
+    <div id="blocMesureLibre" hidden>
+      <h2>Mesure</h2>
+      <div class="reglette" id="regTemps"></div>
+      <h2>Division</h2>
+      <div class="segments souple" id="segDivision"></div>
+    </div>
+    <h1 class="section">Chances</h1>
+    <p class="notice">Chance qu'un coup soit joué. La basse suit le kick.</p>
+    <div class="mixer" id="zoneProba"></div>
     <div id="blocClave" hidden>
       <h2>Clave <small id="litClave"></small></h2>
       <div id="zoneClave"></div>
@@ -452,6 +461,8 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
     <div id="zoneTimbresJam"></div>
     <h2>Basse</h2>
     <div class="segments souple" id="segMarche"></div>
+    <h2>Accords</h2>
+    <div class="segments souple" id="segAccords"></div>
     <h2>Accompagnement</h2>
     <div class="segments souple" id="segAccomp"></div>
     <h2>Départ</h2>
@@ -2482,7 +2493,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '1.6';
+const VERSION_APP = '1.7';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3641,6 +3652,8 @@ function sauverCfg(){
         affichage:jam.affichage, niveau:jam.niveau, familles:jam.familles.slice(),
         marche:jam.marche, timbre:jam.timbre, accomp:jam.accomp, decompte:jam.decompte,
         clave:jam.clave, claveDe:jam.claveDe,
+        temps:jam.temps, division:jam.division, accords:jam.accords,
+        mix:{...jam.mix}, proba:{...jam.proba},
         pistes:jam.pistes.map(p => ({...p})),
       },
       claves:CLAVES_GARDEES,
@@ -3683,6 +3696,16 @@ function chargerCfg(){
         if(bons.length) jam.familles = bons;
       }
       if(Array.isArray(j.clave) && j.clave.length){ jam.clave = j.clave; jam.claveDe = j.claveDe; }
+      if(Number.isInteger(j.temps) && j.temps >= 2 && j.temps <= 32) jam.temps = j.temps;
+      if([2,4,8,16].includes(j.division)) jam.division = j.division;
+      if(typeof j.accords === 'boolean') jam.accords = j.accords;
+      ['mix','proba'].forEach(cle => {
+        if(j[cle] && typeof j[cle] === 'object')
+          Object.keys(jam[cle]).forEach(k => {
+            const v = j[cle][k];
+            if(typeof v === 'number' && v >= 0 && v <= 200) jam[cle][k] = v;
+          });
+      });
       if(Array.isArray(j.pistes) && j.pistes.length === jam.pistes.length)
         jam.pistes = jam.pistes.map((p, i) => {
           const v = j.pistes[i];
@@ -4057,14 +4080,40 @@ const VALEURS = [
   {id:'b',  nom:'𝅗𝅥',   court:'blanche',         d:8},
   {id:'bp', nom:'𝅗𝅥.',  court:'blanche pointée', d:12},
 ];
+/* ⭐ SON INVENTAIRE DE RYTHMIQUES CLASSIQUES (03/09). Les durées sont en
+   DOUBLES-CROCHES : noire 4, noire pointée 6, blanche 8, blanche pointée 12.
+   Chaque temps porte son attaque, k ou s, qu'il peut changer. */
 const METRIQUES = [
-  {id:'4/4',  nom:'4/4',  pas:16, clave:[[4,'k'],[4,'s'],[4,'k'],[4,'s']]},
-  {id:'3/4',  nom:'3/4',  pas:12, clave:[[4,'k'],[4,'s'],[4,'k']]},
-  {id:'5/4',  nom:'5/4',  pas:20, clave:[[6,'k'],[6,'s'],[4,'k'],[4,'s']]},
-  {id:'7/4',  nom:'7/4',  pas:28, clave:[[8,'k'],[8,'s'],[6,'k'],[6,'s']]},
-  {id:'7/8',  nom:'7/8',  pas:14, clave:[[4,'k'],[4,'s'],[6,'k']]},
-  {id:'6/8',  nom:'6/8',  pas:12, clave:[[6,'k'],[6,'s']]},
+  {id:'2/4',    nom:'2/4',        pas:8,  clave:[[4,'k'],[4,'s']]},
+  {id:'3/4',    nom:'3/4',        pas:12, clave:[[4,'k'],[4,'s'],[4,'s']]},
+  {id:'4/4',    nom:'4/4',        pas:16, clave:[[4,'k'],[4,'s'],[4,'k'],[4,'s']]},
+  {id:'5/4a',   nom:'5/4 3+2',    pas:20, clave:[[6,'k'],[6,'s'],[4,'k'],[4,'s']]},
+  {id:'5/4b',   nom:'5/4 2+3',    pas:20, clave:[[4,'k'],[4,'s'],[6,'k'],[6,'s']]},
+  {id:'7/4a',   nom:'7/4 4+3',    pas:28, clave:[[8,'k'],[8,'s'],[6,'k'],[6,'s']]},
+  {id:'7/4b',   nom:'7/4 3+4',    pas:28, clave:[[6,'k'],[6,'s'],[8,'k'],[8,'s']]},
+  {id:'3/8',    nom:'3/8',        pas:6,  clave:[[6,'k']]},
+  {id:'5/8a',   nom:'5/8 2+3',    pas:10, clave:[[4,'k'],[6,'s']]},
+  {id:'5/8b',   nom:'5/8 3+2',    pas:10, clave:[[6,'k'],[4,'s']]},
+  {id:'6/8',    nom:'6/8',        pas:12, clave:[[6,'k'],[6,'s']]},
+  {id:'7/8a',   nom:'7/8 2+2+3',  pas:14, clave:[[4,'k'],[4,'s'],[6,'k']]},
+  {id:'7/8b',   nom:'7/8 3+2+2',  pas:14, clave:[[6,'k'],[4,'s'],[4,'s']]},
+  {id:'9/8',    nom:'9/8 2+2+2+3',pas:18, clave:[[4,'k'],[4,'s'],[4,'k'],[6,'s']]},
+  {id:'12/8',   nom:'12/8',       pas:24, clave:[[6,'k'],[6,'s'],[6,'k'],[6,'s']]},
+  /* ⭐ LE CHAABI est à part : il court sur DEUX mesures de 12/8 et ses pièces ne
+     suivent pas la clave. Charleston sur huit croches, shaker sur les douze,
+     kicks aux croches 1, 5, 11, 17 et 23, caisses aux croches 3 et 8. */
+  {id:'chaabi', nom:'Chaabi 12/8', pas:48, special:'chaabi',
+   clave:[[6,'k'],[6,'s'],[6,'k'],[6,'s'],[6,'k'],[6,'s'],[6,'k'],[6,'s']]},
 ];
+
+/* Les motifs du chaabi, en croches sur deux mesures (24 croches). */
+const CHAABI = {
+  charley: [1,2,4,5,7,8,10,11].flatMap(x => [x, x + 12]),
+  shaker:  Array.from({length:24}, (_, i) => i + 1),
+  grosse:  [1,5,11,17,23],
+  caisse:  [3,8,15,20],
+};
+
 const laMetrique = () => METRIQUES.find(m => m.id === jam.metrique) || METRIQUES[0];
 /* Sa clave à lui : une suite de valeurs, chacune portant son attaque. On part de
    celle de la métrique, il la remanie ensuite. */
@@ -4082,7 +4131,15 @@ const dureeClave = () => claveCourante().reduce((a, c) => a + c[0], 0);
 /* ⭐ En clave personnelle, la MÉTRIQUE EST UNE CONSÉQUENCE de la clave : sa durée
    fait la mesure. Dans les deux autres régimes, c'est la métrique qui commande. */
 const estPerso = () => jam.rythme === 'perso';
-const mesureJam = () => estPerso() ? Math.max(2, dureeClave()) : laMetrique().pas;
+/* ⭐ En euclidien et en clave perso, il choisit lui-même le nombre de TEMPS
+   (2 à 32) et la DIVISION (2, 4, 8 ou 16). Une double-croche est l'unité : un
+   temps vaut donc 16/division doubles. La rythmique classique, elle, garde les
+   métriques écrites. */
+const doublesParTemps = () => 16 / jam.division;
+const mesureLibre = () => Math.max(2, Math.round(jam.temps * doublesParTemps()));
+const mesureJam = () => estPerso() ? Math.max(2, dureeClave())
+                      : jam.rythme === 'euclidien' ? mesureLibre()
+                      : laMetrique().pas;
 
 /* Où l'accord change : les valeurs marquées en clave personnelle, le premier
    temps partout ailleurs. */
@@ -4239,6 +4296,8 @@ const jam = {
   actif:false, tempo:120, metrique:'4/4', parMesure:1,
   rythme:'clave', swing:.5, shaker:true,
   clave:null, claveDe:null, decompte:true, accomp:'pose', rangSuivant:0, attente:0, shaker2:false,
+  temps:4, division:4, accords:true,
+  proba:{grosse:100, caisse:100, charley:100, ride:100, shaker:100},
   mix:{grosse:1, caisse:1, charley:1, ride:1, shaker:1, accords:1, basse:.7},
   pistes:[{id:'grosse', n:4, pas:16, rot:0, proba:100},
           {id:'caisse', n:2, pas:16, rot:4, proba:100},
@@ -4251,8 +4310,12 @@ const jam = {
 
 /* Une pièce de batterie, en synthèse : rien à charger. */
 function frappe(quoi, t, force){
+  /* ⭐ Chaque pièce a sa chance d'être jouée : c'est ce qui fait respirer une
+     rythmique sans qu'on écrive quoi que ce soit. */
+  const pr = jam.proba && jam.proba[quoi];
+  if(pr !== undefined && pr < 100 && Math.random() * 100 >= pr) return false;
   force *= (jam.mix && jam.mix[quoi] !== undefined) ? jam.mix[quoi] : 1;
-  if(force <= 0) return;
+  if(force <= 0) return false;
   const c = contexte();
   const g = c.createGain();
   g.connect(c.destination);
@@ -4270,14 +4333,16 @@ function frappe(quoi, t, force){
     // un bruit filtré fait la peau et les cymbales
     const n = c.createBufferSource();
     const d = quoi === 'ride' ? .5 : quoi === 'charley' ? .06
-            : quoi === 'shaker' ? .075 : .18;
+            : quoi === 'shaker' ? .16 : .18;
     const b = c.createBuffer(1, Math.ceil(c.sampleRate * d), c.sampleRate);
     const x = b.getChannelData(0);
     for(let i = 0; i < x.length; i++){
       const p2 = i / x.length;
       // le shaker monte puis retombe — les grains de la coque se mettent en mouvement
+      /* ⚠️ Un shaker fait « chic », pas « tic » : il lui faut une montée, une queue
+         longue, et du grain — sans quoi il reste sec. */
       const forme = quoi === 'shaker'
-        ? Math.min(1, p2 / .18) * Math.pow(1 - p2, 1.6)
+        ? Math.min(1, p2 / .3) * Math.pow(1 - p2, .8)
         : (1 - p2);
       x[i] = (Math.random() * 2 - 1) * forme;
     }
@@ -4287,8 +4352,8 @@ function frappe(quoi, t, force){
     //    corps. Passe-haut trop raide et durée trop courte donnaient un « tic ».
     f.type = (quoi === 'caisse' || quoi === 'shaker') ? 'bandpass' : 'highpass';
     f.frequency.value = quoi === 'caisse' ? 1900 : quoi === 'charley' ? 7000
-                      : quoi === 'shaker' ? 6500 : 4200;
-    if(quoi === 'shaker') f.Q.value = .7;
+                      : quoi === 'shaker' ? 5200 : 4200;
+    if(quoi === 'shaker') f.Q.value = .35;      // bande large : du grain, pas un sifflet
     const g2 = c.createGain();
     g2.gain.setValueAtTime(force * (quoi === 'caisse' ? .22 : quoi === 'charley' ? .1
                                   : quoi === 'shaker' ? .16 : .07), t);
@@ -4360,8 +4425,19 @@ function pasJam(){
     const swing = (i % 4 === 2) ? (jam.swing - .5) * duree * 4 : 0;
     const t = jam.prochain + swing;
     // ⚠️ le shaker marque le débit dans TOUS les régimes, pas seulement en clave
-    if(jam.shaker2) frappe('shaker', t, i % 4 === 0 ? .95 : .6);
-    if(jam.rythme !== 'euclidien'){
+    if(jam.shaker2 && !(jam.rythme === 'clave' && laMetrique().special))
+      frappe('shaker', t, i % 4 === 0 ? .95 : .6);
+    const spec = jam.rythme === 'clave' && laMetrique().special === 'chaabi';
+    if(spec){
+      // les croches sont numérotées à partir de 1, un pas sur deux
+      const cr = (i % 2 === 0) ? (i / 2) + 1 : 0;
+      if(cr){
+        if(CHAABI.grosse.includes(cr))  frappe('grosse', t, cr === 1 ? 1 : .85);
+        if(CHAABI.caisse.includes(cr))  frappe('caisse', t, .85);
+        if(CHAABI.charley.includes(cr)) frappe('charley', t, cr === 1 ? .9 : .6);
+        if(CHAABI.shaker.includes(cr))  frappe('shaker', t, cr === 1 ? .95 : .6);
+      }
+    }else if(jam.rythme !== 'euclidien'){
       const son = motif[i];
       if(son === 'k' || son === 'b') frappe('grosse', t, i === 0 ? 1 : .8);
       if(son === 's' || son === 'b') frappe('caisse', t, i === 0 ? 1 : .8);
@@ -4376,10 +4452,10 @@ function pasJam(){
     /* ⭐ L'accompagnement peut suivre la clave au lieu de se poser sur le seul
        premier temps : l'accord se réarticule sur les attaques, plus doucement,
        ce qui donne une assise rythmique au lieu d'une nappe. */
-    if(jam.accomp === 'clave' && jam.courant && motif && motif[i] && !changes.includes(i))
+    if(jam.accords && jam.accomp === 'clave' && jam.courant && motif && motif[i] && !changes.includes(i))
       jouerAccordJam(jam.courant, t, true, .5);
     // un appui « plein » rejoue l'accord franchement, dans une autre disposition
-    else if(jam.courant && rappels.includes(i) && !changes.includes(i))
+    else if(jam.accords && jam.courant && rappels.includes(i) && !changes.includes(i))
       jouerAccordJam(jam.courant, t, true);
 
     if(changes.includes(i)){                       // un accord change ici
@@ -4396,7 +4472,7 @@ function pasJam(){
       /* ⭐ Sa règle : un accord tenu deux mesures doit SONNER À NOUVEAU sur
          chaque premier temps — sinon la mesure suivante n'a plus de repère. */
       if(e){
-        jouerAccordJam(e, t, jam.mesure % jam.parMesure !== 0);
+        if(jam.accords) jouerAccordJam(e, t, jam.mesure % jam.parMesure !== 0);
         /* ⚠️ L'affichage se programmait au moment du CALCUL, jusqu'à 200 ms avant
            le son : le décompte et le compteur avaient toujours une longueur
            d'avance. On les retarde jusqu'à l'instant où la note sonne vraiment. */
@@ -4479,6 +4555,10 @@ function jouerAccordJam(entree, t, rappel, attenuation){
     /* ⚠️ La contrebasse est en SYNTHÈSE : elle reçoit la compensation du grave,
        qui l'amplifie de 60 % environ. Son niveau de base doit donc être bien
        plus bas que celui d'une voix d'accord, sinon elle couvre la section. */
+    /* ⭐ La basse est liée au kick : même chance d'être jouée. Une grosse caisse
+       qui saute sans sa basse sonne comme un trou. */
+    const pk = jam.proba ? jam.proba.grosse : 100;
+    if(pk < 100 && Math.random() * 100 >= pk) return;
     const vb = .14 * (jam.mix ? jam.mix.basse : 1);
     voix('contrebasse', b, t, noire * 1.4, vb);
     if(jam.marche) voix('contrebasse', b + 7, t + mes / 2, noire * .9, vb * .87);
@@ -4568,6 +4648,25 @@ function construireJam(){
   seg('segShaker2', 'shaker2', [[true,'shaker'],[false,'sans']]);
   seg('segDecompte', 'decompte', [[true,'avec décompte'],[false,'départ direct']]);
   seg('segAccomp', 'accomp', [['pose','posé'],['clave','sur la clave']]);
+  seg('segAccords', 'accords', [[true,'avec accords'],[false,'métronome seul']]);
+  seg('segDivision', 'division', [[2,'blanches'],[4,'noires'],[8,'croches'],[16,'doubles']]);
+  /* La métrique écrite ne sert qu'à la rythmique classique ; ailleurs il compose
+     sa mesure avec le nombre de temps et la division. */
+  const libre = jam.rythme !== 'clave';
+  const bml = $('blocMesureLibre'); if(bml) bml.hidden = !libre;
+  const bm2 = $('blocMetrique'); if(bm2) bm2.hidden = libre && jam.rythme === 'euclidien';
+  const rt = $('regTemps');
+  if(rt){
+    rt.innerHTML = '';
+    const moins = document.createElement('button'); moins.textContent = '−';
+    moins.onclick = () => { jam.temps = Math.max(2, jam.temps - 1); construireJam(); if(jam.actif) relancerJam(); };
+    const lu = document.createElement('span');
+    lu.innerHTML = 'temps par mesure<b>' + jam.temps + '</b>';
+    const plus = document.createElement('button'); plus.textContent = '+';
+    plus.onclick = () => { jam.temps = Math.min(32, jam.temps + 1); construireJam(); if(jam.actif) relancerJam(); };
+    rt.appendChild(moins); rt.appendChild(lu); rt.appendChild(plus);
+  }
+  construireProba();
   const zp2 = $('blocPrets');
   if(zp2) zp2.hidden = !estPerso();
   const zg = $('zoneClavesGardees');
@@ -4708,6 +4807,26 @@ function construireClave(){
 
 /* Six faders verticaux : c'est le geste qu'on attend d'une table de mixage,
    et il se lit d'un coup d'œil. */
+/* Le second mixer : non plus le volume, mais la CHANCE qu'un coup soit joué. */
+function construireProba(){
+  const z = $('zoneProba'); if(!z) return;
+  z.innerHTML = '';
+  VOIES.filter(v => jam.proba[v.id] !== undefined).forEach(v => {
+    const d = document.createElement('div');
+    d.className = 'voie';
+    const f = document.createElement('input');
+    f.type = 'range'; f.min = '0'; f.max = '100'; f.step = '5';
+    f.value = String(jam.proba[v.id]); f.className = 'fader';
+    const lu = document.createElement('small'); lu.textContent = f.value + ' %';
+    f.oninput = () => { jam.proba[v.id] = +f.value; lu.textContent = f.value + ' %'; };
+    f.onchange = sauverCfg;
+    const t = document.createElement('b');
+    t.textContent = v.id === 'grosse' ? 'Kick+Bass' : v.nom;
+    d.appendChild(f); d.appendChild(lu); d.appendChild(t);
+    z.appendChild(d);
+  });
+}
+
 function construireMix(){
   const z = $('zoneMix'); if(!z) return;
   z.innerHTML = '';
