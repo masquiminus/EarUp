@@ -2549,7 +2549,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '2.0';
+const VERSION_APP = '2.1';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4204,11 +4204,19 @@ const laMetrique = () => {
 /* Sa clave à lui : une suite de valeurs, chacune portant son attaque. On part de
    celle de la métrique, il la remanie ensuite. */
 function claveCourante(){
-  const m = laMetrique();
-  if(!jam.clave || jam.claveDe !== m.id){
+  /* ⚠️ En rythmique classique la clave EST celle de la métrique — et suit donc la
+     séquence. En clave personnelle elle est à lui : la métrique ne sert qu'à
+     l'amorcer, et il ne faut surtout pas la reconstruire à chaque mesure, ce qui
+     arrivait en Practice où chaque mesure porte sa propre métrique. */
+  if(!estPerso()){
+    const m = laMetrique();
+    return m.clave.map((x, i) => [x[0], x[1], i === 0 ? 2 : 0]);
+  }
+  const amorce = METRIQUES.find(x => x.id === jam.metrique) || METRIQUES[0];
+  if(!jam.clave || jam.claveDe !== jam.metrique){
     // le troisième champ marque un CHANGEMENT D'ACCORD ; par défaut le premier temps
-    jam.clave = m.clave.map((x, i) => [x[0], x[1], i === 0 ? 2 : 0]);
-    jam.claveDe = m.id;
+    jam.clave = amorce.clave.map((x, i) => [x[0], x[1], i === 0 ? 2 : 0]);
+    jam.claveDe = jam.metrique;
   }
   return jam.clave;
 }
@@ -4289,7 +4297,10 @@ function rappelerClave(c){
 }
 
 function claveAuHasard(){
-  const cible = laMetrique().pas;
+  /* ⭐ On garde la LONGUEUR de la clave en cours et on ne retire que ses appuis :
+     sans ça le bouton ramenait la mesure à celle de la métrique classique, alors
+     qu'on venait justement de composer la sienne. */
+  const cible = (jam.clave && jam.clave.length) ? dureeClave() : laMetrique().pas;
   const dispo = VALEURS.map(v => v.d);
   let out = [], reste = cible;
   let garde = 0;
