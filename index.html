@@ -1797,7 +1797,10 @@ const TIMBRES = [
   {id:'piano-feutre', nom:'Piano feutré', groupe:'Piano', court:'Feutré',
    ambitus:[28,96], grave:[33,64],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:2},
-  {id:'rhodes', nom:'Rhodes', ambitus:[28,91], grave:[33,60],
+  {id:'rhodes', nom:'Rhodes', groupe:'Rhodes', court:'Nu', gain:1.4, ambitus:[28,91], grave:[33,60],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  // ⭐ La variante avec chorus : une couleur très typée de cet instrument.
+  {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.9, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
   {id:'guitareac', nom:'Guitare acoustique', groupe:'Guitare', court:'Acoustique',
@@ -2296,7 +2299,13 @@ function voix(timbreId, midi, quand, duree, vol, banqueId){
   const banque = ECH[banqueId || timbreId];
   const dispo = banque ? Object.keys(banque).map(Number) : [];
   if(dispo.length){
-    const src = dispo.reduce((a,b) => Math.abs(b-midi) < Math.abs(a-midi) ? b : a);
+    /* ⭐ On prend l'échantillon le plus proche, et À DISTANCE ÉGALE celui du DESSUS :
+       descendre une note garde mieux son timbre que la monter. Sur un Rhodes
+       échantillonné toutes les tierces majeures, ça s'entend. */
+    const src = dispo.reduce((a, b) => {
+      const da = Math.abs(a - midi), db = Math.abs(b - midi);
+      return db < da || (db === da && b > a) ? b : a;
+    });
     const s = c.createBufferSource();
     s.buffer = banque[src];
     s.playbackRate.value = Math.pow(2, (midi - src) / 12);
@@ -2549,7 +2558,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '2.1';
+const VERSION_APP = '2.2';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
