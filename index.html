@@ -1810,9 +1810,9 @@ const TIMBRES = [
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
   // ⭐ Deux banques retenues après essai ; le Rhodes Mark II a été écarté.
-  {id:'wurlitzer', nom:'Wurlitzer 200', gain:2.1, ambitus:[28,91], grave:[33,60],
+  {id:'wurlitzer', nom:'Wurlitzer 200', gain:2.9, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  {id:'elepian', nom:'Elepian', gain:2.34,
+  {id:'elepian', nom:'Elepian', gain:3.4,
    /* ⭐⭐ TIMBRE DYNAMIQUE : la banque change avec l'intensité demandée.
       Les trois couches gardent leur écart de niveau d'origine — doux est
       10 dB sous fort — de sorte que jouer plus fort ne fait pas que monter
@@ -1845,14 +1845,14 @@ const TIMBRES = [
              ['trompette lead',52,86]]},
   {id:'bois', nom:'Bois', ambitus:[34,96], styles:['serre','drop2'], doublage:0,
    pupitres:[['basson',34,72],['clarinette',50,91],['hautbois',58,91],['flûte',60,96]]},
-  {id:'saxes-forte', nuance:'forte', nom:'Saxes forte', groupe:'Saxes', court:'Forte',
+  {id:'saxes-forte', nuance:'forte', nom:'Saxes forte', groupe:'Saxes', court:'Forte', gain:1.9,
    // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
    ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
    // ce sont ses suraigus, joués plutôt que par un soprano.
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
-  {id:'saxes-piano', nuance:'piano', nom:'Saxes piano', groupe:'Saxes', court:'Piano',
+  {id:'saxes-piano', nuance:'piano', nom:'Saxes piano', groupe:'Saxes', court:'Piano', gain:2.8,
    // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
    ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
@@ -1860,7 +1860,7 @@ const TIMBRES = [
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
   // ⚠️ ses pêches sont enregistrées plus bas que les tenues : on relève au tirage
-  {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche', gain:1.35,
+  {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche', gain:2.3,
    // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
    ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
@@ -1871,7 +1871,7 @@ const TIMBRES = [
   /* ⚠️ Ses échantillons d'Iowa sont gravés bas — crête médiane à −10 dB —, donc
      la contrebasse paraissait faible face aux saxes. On relève au TIRAGE, jamais
      dans les fichiers : `gain` multiplie le volume de ce timbre. */
-  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:2.6},
+  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:4.2},
 ];
 
 /* Registre de base : donné, ou déduit du pupitre le plus grave. */
@@ -2666,7 +2666,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.4';
+const VERSION_APP = '3.6';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
