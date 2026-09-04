@@ -2666,7 +2666,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.6';
+const VERSION_APP = '3.7';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4308,7 +4308,9 @@ const CHAABI = {
   souvent: [8, 13, 20],
   rare:    [2, 5, 11, 14, 17, 23],
 };
-const CHAABI_SOUVENT = .45, CHAABI_RARE = .15;
+// ⚠️ Ces taux ont d'abord été trop hauts : l'accord se redisait sans arrêt et
+//    la grille perdait sa respiration. Abaissés après écoute.
+const CHAABI_SOUVENT = .22, CHAABI_RARE = .07;
 
 /* ⭐ UNE SÉQUENCE DE MESURES : jusqu'à quatre métriques qui s'enchaînent, pour
    atteindre d'un geste les mesures composées — 4/4 + 7/8 + 3/8 + 2/4, ou trois
@@ -4782,7 +4784,11 @@ function pasJam(){
     /* ⭐ L'accompagnement peut suivre la clave au lieu de se poser sur le seul
        premier temps : l'accord se réarticule sur les attaques, plus doucement,
        ce qui donne une assise rythmique au lieu d'une nappe. */
-    if(jam.accords && jam.accomp === 'clave' && jam.courant && motif && motif[i] && !changes.includes(i))
+    /* ⚠️ Le CHAABI a ses propres replaquages, écrits croche par croche : y ajouter
+       ceux de l'accompagnement « sur la clave » faisait sonner l'accord huit fois
+       de plus par cycle. */
+    if(jam.accords && jam.accomp === 'clave' && !laMetrique().special
+       && jam.courant && motif && motif[i] && !changes.includes(i))
       jouerAccordJam(jam.courant, t, true, .5);
     // un appui « plein » rejoue l'accord franchement, dans une autre disposition
     else if(jam.accords && jam.courant && rappels.includes(i) && !changes.includes(i))

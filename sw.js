@@ -2,7 +2,7 @@
    ⚠️ LE NUMÉRO DE VERSION EST LE SEUL PIÈGE DES PWA : sans changement ici, les
    testeurs restent sur l'ancienne version sans comprendre pourquoi. À incrémenter
    à CHAQUE livraison. */
-const VERSION = 'earup-v28';
+const VERSION = 'earup-v29';
 const COQUE = ['./', './index.html', './manifest.webmanifest', './icone.svg'];
 
 self.addEventListener('install', e => {
