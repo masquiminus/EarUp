@@ -2360,7 +2360,7 @@ function sousUneCouche(timbreId, vol, faire){
   try{ faire(); } finally{ COUCHE_ACCORD = null; }
 }
 
-function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
+function voix(timbreId, midi, quand, duree, vol, banqueId, tenir, tronquer){
   // un timbre peut porter son propre gain, pour compenser des échantillons
   // gravés plus bas que les autres sans toucher aux fichiers
   const tG = TIMBRES.find(x => x.id === timbreId);
@@ -2384,7 +2384,21 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
   const p = PROFILS[timbreId] || PROFILS.synthe;
   const g = c.createGain();
   const echantillonne = bq && Object.keys(bq).length;
+  const banque = ECH[banqueId || timbreId];
+  const dispoP = banque ? Object.keys(banque).map(Number) : [];
+  const srcProche = dispoP.length ? dispoP.reduce((a2, b2) => {
+    const da = Math.abs(a2 - midi), db = Math.abs(b2 - midi);
+    return db < da || (db === da && b2 > a2) ? b2 : a2;
+  }) : null;
   if(echantillonne){
+    /* ⚠️ Un échantillon ne doit jamais être coupé avant sa fin quand rien ne
+       presse : le Rhodes dure 5 s, le Wurlitzer 4 — les couper à 3,4 leur retirait
+       leur extinction. On étend la tenue à la longueur du son, sauf en jeu
+       rythmique où la coupe est voulue. */
+    if(!tronquer){
+      const b0 = banque && banque[srcProche];
+      if(b0 && b0.duration) duree = Math.max(duree, b0.duration - .05);
+    }
     /* ⚠️⚠️ UN ÉCHANTILLON A DÉJÀ SA PROPRE EXTINCTION. Lui imposer l'enveloppe de
        la synthèse — une descente exponentielle sur les 300 dernières
        millisecondes — remplaçait sa queue naturelle par une queue calculée : c'est
@@ -2411,16 +2425,12 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
   const suivi = tenir ? {g, vol} : null;
   if(suivi) VOIX_EN_COURS.push(suivi);
 
-  const banque = ECH[banqueId || timbreId];
-  const dispo = banque ? Object.keys(banque).map(Number) : [];
+  const dispo = dispoP;
   if(dispo.length){
     /* ⭐ On prend l'échantillon le plus proche, et À DISTANCE ÉGALE celui du DESSUS :
        descendre une note garde mieux son timbre que la monter. Sur un Rhodes
        échantillonné toutes les tierces majeures, ça s'entend. */
-    const src = dispo.reduce((a, b) => {
-      const da = Math.abs(a - midi), db = Math.abs(b - midi);
-      return db < da || (db === da && b > a) ? b : a;
-    });
+    const src = srcProche;   // déjà choisi plus haut
     const s = c.createBufferSource();
     s.buffer = banque[src];
     s.playbackRate.value = Math.pow(2, (midi - src) / 12);
@@ -2518,7 +2528,7 @@ function jouer(notes, mode, basse){
        extinction naturelle et c'est ce qu'il entendait comme « synthétique ».
        Hors du Terrain rien ne presse, on les laisse aller jusqu'au bout. */
     voix(cfg.timbre, n, t0 + i * pas, mode === 'arpege' ? 1.5 : 3.4,
-         .16 * renfort, banqueDeVoix(t, rang, total, n));
+         .16 * renfort, banqueDeVoix(t, rang, total, n), false, false);
   });
   });
 }
@@ -2709,7 +2719,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '4.0';
+const VERSION_APP = '4.1';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3909,7 +3919,7 @@ function chargerCfg(){
       });
       if(['rien','basse','nature'].includes(j.affichage)) jam.affichage = j.affichage;
       if(j.niveau === 'perso' || NIVEAUX_CTX.some(n => n.id === j.niveau)) jam.niveau = j.niveau;
-      if(['pose','clave'].includes(j.accomp)) jam.accomp = j.accomp;
+      if(['tenu','pose','clave'].includes(j.accomp)) jam.accomp = j.accomp;
       if(TIMBRES.some(t => t.id === j.timbre && !t.basse)) jam.timbre = j.timbre;
       if(Array.isArray(j.familles)){
         const bons = j.familles.filter(f => FAMILLES_JAM.some(x => x.id === f));
@@ -4943,13 +4953,19 @@ function jouerAccordJam(entree, t, rappel, attenuation){
      s'éteignait bien avant la suivante, et sur une mesure courte il traînait.
      On le fait sonner jusqu'à la fin de sa mesure — l'étouffement se charge de
      l'arrêter net si un nouvel accord arrive plus tôt. */
+  /* ⭐ Trois façons de tenir l'accord :
+       « tenu »       — il sonne jusqu'au suivant, l'échantillon va au bout ;
+       « dynamique »  — il est coupé après 2,2 noires, ce qui aère la grille ;
+       « sur la clave » — il se réarticule sur les appuis, donc court par nature. */
   const mesureSec = mesureJam() * noire / 4;
   const tenue = attenuation ? Math.min(noire * 1.4, mesureSec)
-                            : Math.max(noire, mesureSec * (jam.parMesure || 1));
+              : jam.accomp === 'pose' ? noire * 2.2
+              : Math.max(noire, mesureSec * (jam.parMesure || 1));
+  const tronquer = jam.accomp !== 'tenu';
   etoufferAccord(t);
   sousUneCouche(jam.timbre, v, () => {
     notes.forEach((n, i) => voix(jam.timbre, n, t, tenue, v,
-                                 banqueDeVoix(tb, i, total, n), true));
+                                 banqueDeVoix(tb, i, total, n), true, tronquer));
   });
   // une basse qui marche : fondamentale, puis quinte à mi-mesure
   const b = 36 + dec;
@@ -5058,7 +5074,7 @@ function construireJam(){
   seg('segShaker', 'shaker', [[true,'charleston'],[false,'sans']]);
   seg('segShaker2', 'shaker2', [[true,'shaker'],[false,'sans']]);
   seg('segDecompte', 'decompte', [[true,'avec décompte'],[false,'départ direct']]);
-  seg('segAccomp', 'accomp', [['pose','posé'],['clave','sur la clave']]);
+  seg('segAccomp', 'accomp', [['tenu','tenu'],['pose','dynamique'],['clave','sur la clave']]);
   seg('segAccords', 'accords', [[true,'avec accords'],[false,'métronome seul']]);
   seg('segDivision', 'division', [[2,'blanches'],[4,'noires'],[8,'croches'],[16,'doubles']]);
   /* La métrique écrite ne sert qu'à la rythmique classique ; ailleurs il compose
