@@ -1809,6 +1809,18 @@ const TIMBRES = [
   {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.9, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
+  // ⭐ Deux banques retenues après essai ; le Rhodes Mark II a été écarté.
+  {id:'wurlitzer', nom:'Wurlitzer 200', gain:2.1, ambitus:[28,91], grave:[33,60],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  {id:'elepian', nom:'Elepian', gain:2.34,
+   /* ⭐⭐ TIMBRE DYNAMIQUE : la banque change avec l'intensité demandée.
+      Les trois couches gardent leur écart de niveau d'origine — doux est
+      10 dB sous fort — de sorte que jouer plus fort ne fait pas que monter
+      le volume : le son mord davantage. C'est le drive qui manquait. */
+   couches:[[.165,'elepian-fort'],[.105,'elepian-moyen'],[0,'elepian-doux']], ambitus:[28,91], grave:[33,60],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+
+
   {id:'guitareac', nom:'Guitare acoustique', groupe:'Guitare', court:'Acoustique',
    guitare:true, ambitus:[40,78]},
   {id:'guitareel', nom:'Guitare électrique', groupe:'Guitare', court:'Électrique',
@@ -2201,7 +2213,10 @@ const ECH = {};   // id du timbre -> { numéro MIDI : AudioBuffer }
 const BANQUES_SAX = [];
 ['bary','tenor','alto'].forEach(i => ['forte','piano','peche']
   .forEach(n => BANQUES_SAX.push(`sax${i}-${n}`)));
-const idsBanques = () => TIMBRES.map(t => t.id).concat(BANQUES_SAX);
+/* ⚠️ Les COUCHES d'un timbre dynamique ne sont pas des timbres : elles n'ont pas
+   d'entrée dans TIMBRES, mais leurs fichiers doivent quand même être reconnus. */
+const idsBanques = () => TIMBRES.map(t => t.id).concat(BANQUES_SAX)
+  .concat(TIMBRES.flatMap(t => (t.couches || []).map(c => c[1])));
 
 function analyserNom(nom){
   /* ⭐ Les entrées peuvent porter un DOSSIER — « saxes/saxbary-forte-36.mp3 » —
@@ -2337,6 +2352,12 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
   // un timbre peut porter son propre gain, pour compenser des échantillons
   // gravés plus bas que les autres sans toucher aux fichiers
   const tG = TIMBRES.find(x => x.id === timbreId);
+  /* ⭐ Timbre dynamique : on choisit la COUCHE d'après l'intensité demandée, avant
+     que le gain ne la modifie. Plus l'attaque est forte, plus l'échantillon mord. */
+  if(tG && tG.couches && !banqueId){
+    const c = tG.couches.find(x => vol >= x[0]) || tG.couches[tG.couches.length - 1];
+    banqueId = c[1];
+  }
   if(tG && tG.gain) vol *= tG.gain;
   const c = contexte();
   /* ⚠️ En SYNTHÈSE les graves sonnent nettement plus faibles — il prenait la
@@ -2624,7 +2645,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.2';
+const VERSION_APP = '3.3';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
