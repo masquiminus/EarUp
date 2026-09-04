@@ -975,7 +975,7 @@ const AJOUTS = {
            [9,'m6','vi6'],[9,'7','VI7'],
            [10,'13b9','♭VII13♭9'],
            [11,'7','VII7']],
-    pro:[], prop:[],
+    pro:[],     prop:[],
   },
   mineur: {
     // harmonique, sans le ♭III+ : personne ne le joue, il ferait buter d'entrée
@@ -2719,7 +2719,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '4.2';
+const VERSION_APP = '4.3';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3159,9 +3159,22 @@ const tirerParmi = liste => {
 /* ⭐ Sa liste, complétée pour qu'AUCUNE nature de Confirmé + ne disparaisse en
    Pro : m9 cède la place à m11 (le 6/9 couvre déjà la neuvième mineure), et
    maj♭5, m6/9, ø9, 7sus4♭9 et 13sus4♭9 rejoignent le niveau. */
+/* ⚠️⚠️ C'EST ICI QUE SE DÉCIDE CE QU'ON ENTEND EN PROFESSIONNEL, pas dans AJOUTS :
+   à ce niveau les accords viennent de la GRAMMAIRE de cadences, qui enrichit
+   chaque degré en puisant dans cette liste. Ajouter une nature au vivier n'y
+   change rien — vérifié, 15 ajouts sans le moindre effet.
+   ⭐ SA RÈGLE POUR CHOISIR : ce n'est pas la difficulté de l'accord qui compte,
+   c'est son caractère EXCEPTIONNEL — on ajoute d'abord de nouveaux mots, pas des
+   synonymes de mots connus. D'où Δ13♯11 sans Δ9♯11 : le second ressemblerait trop
+   au Δ7♯11 déjà présent. */
 const TENSIONS_PRO = ['maj9','m11','mMaj7','13','13sus4','maj7d5',
                       'majb5','m69','m9b5','7sus4b9','13sus4b9',
-                      'maj7d11','m6','maj7b5'];   // les trois derniers manquaient encore
+                      'maj7d11','m6','maj7b5',
+                      // ⭐ sa sélection du 03/09
+                      'maj','min','dim','aug',            // les triades nues
+                      '6','six9','add9','maj13d11',       // les majeurs enrichis
+                      'm9',                               // le mineur enrichi
+                      '13d11','7d9'];                     // les dominantes
 /* ⚠️ Les familles PAUVRES (demi-diminué, diminué : trois natures chacune) ne
    peuvent pas suivre la même règle — à 12 % de base, les deux autres se
    partageaient 88 %. On leur laisse donc 40 % à la nature de base. */
