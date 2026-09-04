@@ -2383,14 +2383,28 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
     vol *= 1 + Math.min(.8, Math.max(0, 55 - midi) * .035);
   const p = PROFILS[timbreId] || PROFILS.synthe;
   const g = c.createGain();
-  g.gain.setValueAtTime(0, quand);
-  g.gain.linearRampToValueAtTime(vol, quand + p.att);
-  if(p.dec){
-    g.gain.exponentialRampToValueAtTime(vol * .3, quand + p.dec);
-    g.gain.exponentialRampToValueAtTime(.0008, quand + duree);
+  const echantillonne = bq && Object.keys(bq).length;
+  if(echantillonne){
+    /* ⚠️⚠️ UN ÉCHANTILLON A DÉJÀ SA PROPRE EXTINCTION. Lui imposer l'enveloppe de
+       la synthèse — une descente exponentielle sur les 300 dernières
+       millisecondes — remplaçait sa queue naturelle par une queue calculée : c'est
+       ce qu'il entendait comme « synthétique en fin de note ». On se contente
+       d'ouvrir en douceur, puis de relâcher assez lentement pour ne pas couper. */
+    g.gain.setValueAtTime(0, quand);
+    g.gain.linearRampToValueAtTime(vol, quand + .004);
+    const relache = Math.min(.45, Math.max(.15, duree * .25));
+    g.gain.setValueAtTime(vol, quand + duree);
+    g.gain.exponentialRampToValueAtTime(.0008, quand + duree + relache);
   }else{
-    g.gain.setValueAtTime(vol, quand + duree - .3);   // son tenu, puis relâché
-    g.gain.exponentialRampToValueAtTime(.0008, quand + duree);
+    g.gain.setValueAtTime(0, quand);
+    g.gain.linearRampToValueAtTime(vol, quand + p.att);
+    if(p.dec){
+      g.gain.exponentialRampToValueAtTime(vol * .3, quand + p.dec);
+      g.gain.exponentialRampToValueAtTime(.0008, quand + duree);
+    }else{
+      g.gain.setValueAtTime(vol, quand + duree - .3);   // son tenu, puis relâché
+      g.gain.exponentialRampToValueAtTime(.0008, quand + duree);
+    }
   }
   g.connect(sortie());
   // on retient la voix pour pouvoir l'étouffer si un nouvel accord arrive
@@ -2421,7 +2435,7 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
     const depart = quand - avance;
     if(depart >= c.currentTime) s.start(depart);
     else { if(suivi) suivi.src = s; s.start(c.currentTime, c.currentTime - depart); }
-    s.stop(quand + duree + .1);
+    s.stop(quand + duree + .6);
     return;
   }
   const filtre = c.createBiquadFilter();
@@ -2500,7 +2514,10 @@ function jouer(notes, mode, basse){
     const renfort = (estGrave && cfg.basseRenfort) ? 1.35 : 1;
     if(contre){ voix('contrebasse', n, t0, 1.5, .26 * renfort); return; }
     const rang = basse != null ? i - 1 : i;
-    voix(cfg.timbre, n, t0 + i * pas, mode === 'arpege' ? 1.5 : 1.9,
+    /* ⚠️ Ses échantillons durent 2,6 à 2,9 s : les couper à 1,9 tronquait leur
+       extinction naturelle et c'est ce qu'il entendait comme « synthétique ».
+       Hors du Terrain rien ne presse, on les laisse aller jusqu'au bout. */
+    voix(cfg.timbre, n, t0 + i * pas, mode === 'arpege' ? 1.5 : 3.4,
          .16 * renfort, banqueDeVoix(t, rang, total, n));
   });
   });
@@ -2523,11 +2540,15 @@ function sortie(){
   const g = c.createGain();
   g.gain.value = .72;
   const lim = c.createDynamicsCompressor();
-  lim.threshold.value = -8;      // on ne retient que ce qui dépasse
-  lim.knee.value = 6;            // en douceur, pour ne pas s'entendre
-  lim.ratio.value = 8;
-  lim.attack.value = .004;
-  lim.release.value = .18;
+  /* ⚠️ Réglé haut et doux À DESSEIN : un limiteur qui travaille en permanence
+     écrase les transitoires et donne ce côté « synthétique » qu'il a relevé. Il
+     ne doit rattraper que les vraies surcharges — un accord dense plus la
+     batterie —, jamais un accord seul. */
+  lim.threshold.value = -2;
+  lim.knee.value = 14;           // genou très large : la reprise est invisible
+  lim.ratio.value = 4;
+  lim.attack.value = .012;       // laisse passer l'attaque
+  lim.release.value = .3;
   g.connect(lim); lim.connect(c.destination);
   SORTIE = g;
   return SORTIE;
@@ -2688,7 +2709,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.8';
+const VERSION_APP = '4.0';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4918,9 +4939,16 @@ function jouerAccordJam(entree, t, rappel, attenuation){
   /* ⭐ Toute nouvelle attaque COUPE l'accord en cours, replaquage compris : avec
      des échantillons longs on entendrait sinon une bouillie au bout de quelques
      mesures. Une réarticulation est en outre brève. */
+  /* ⚠️ La durée était figée à 2,2 noires : sur une mesure longue l'accord
+     s'éteignait bien avant la suivante, et sur une mesure courte il traînait.
+     On le fait sonner jusqu'à la fin de sa mesure — l'étouffement se charge de
+     l'arrêter net si un nouvel accord arrive plus tôt. */
+  const mesureSec = mesureJam() * noire / 4;
+  const tenue = attenuation ? Math.min(noire * 1.4, mesureSec)
+                            : Math.max(noire, mesureSec * (jam.parMesure || 1));
   etoufferAccord(t);
   sousUneCouche(jam.timbre, v, () => {
-    notes.forEach((n, i) => voix(jam.timbre, n, t, noire * (attenuation ? 1.1 : 2.2), v,
+    notes.forEach((n, i) => voix(jam.timbre, n, t, tenue, v,
                                  banqueDeVoix(tb, i, total, n), true));
   });
   // une basse qui marche : fondamentale, puis quinte à mi-mesure
