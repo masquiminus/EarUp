@@ -1808,9 +1808,6 @@ const TIMBRES = [
   // ⭐ La variante avec chorus : une couleur très typée de cet instrument.
   {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.9, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  // ⭐ La troisième variante de la banque : graves renforcés, notes plus courtes.
-  {id:'rhodes-bass', nom:'Rhodes bass', groupe:'Rhodes', court:'Bass', gain:1.5, ambitus:[28,91], grave:[33,60],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
   {id:'guitareac', nom:'Guitare acoustique', groupe:'Guitare', court:'Acoustique',
    guitare:true, ambitus:[40,78]},
@@ -2314,7 +2311,29 @@ function corpsSon(buf){
   return buf._corps;
 }
 
-function voix(timbreId, midi, quand, duree, vol, banqueId){
+/* ⭐⭐ ÉTOUFFEMENT DES ACCORDS. Avec des échantillons longs — pianos, Rhodes à
+   sustain —, l'accord précédent sonne encore quand le suivant arrive : au bout
+   de quatre mesures on entend une bouillie. On garde donc la trace des voix en
+   cours d'un accompagnement, et on les relâche à la nouvelle attaque, avec un
+   court fondu pour ne pas produire de clic.
+   ⚠️ Cela ne concerne QUE le Terrain et Practice : dans Recon OP et Boussole,
+   l'accord est seul et doit résonner tout son soûl. */
+let VOIX_EN_COURS = [];
+
+function etoufferAccord(quand, temps){
+  const t = temps === undefined ? .09 : temps;
+  VOIX_EN_COURS.forEach(v => {
+    try{
+      v.g.gain.cancelScheduledValues(quand);
+      v.g.gain.setValueAtTime(Math.max(.0008, v.vol), quand);
+      v.g.gain.exponentialRampToValueAtTime(.0008, quand + t);
+      if(v.src && v.src.stop) v.src.stop(quand + t + .02);
+    }catch(e){ /* la voix s'est déjà éteinte */ }
+  });
+  VOIX_EN_COURS = [];
+}
+
+function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
   // un timbre peut porter son propre gain, pour compenser des échantillons
   // gravés plus bas que les autres sans toucher aux fichiers
   const tG = TIMBRES.find(x => x.id === timbreId);
@@ -2338,6 +2357,9 @@ function voix(timbreId, midi, quand, duree, vol, banqueId){
     g.gain.exponentialRampToValueAtTime(.0008, quand + duree);
   }
   g.connect(c.destination);
+  // on retient la voix pour pouvoir l'étouffer si un nouvel accord arrive
+  const suivi = tenir ? {g, vol} : null;
+  if(suivi) VOIX_EN_COURS.push(suivi);
 
   const banque = ECH[banqueId || timbreId];
   const dispo = banque ? Object.keys(banque).map(Number) : [];
@@ -2362,7 +2384,7 @@ function voix(timbreId, midi, quand, duree, vol, banqueId){
     const avance = (cfg.app === 'jam' || cfg.app === 'prat') ? corpsSon(s.buffer) : 0;
     const depart = quand - avance;
     if(depart >= c.currentTime) s.start(depart);
-    else s.start(c.currentTime, c.currentTime - depart);   // trop tard : on rattrape
+    else { if(suivi) suivi.src = s; s.start(c.currentTime, c.currentTime - depart); }
     s.stop(quand + duree + .1);
     return;
   }
@@ -2602,7 +2624,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.0';
+const VERSION_APP = '3.2';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4821,9 +4843,12 @@ function jouerAccordJam(entree, t, rappel, attenuation){
   jam.notesCourantes = notes; jam.entreeCourante = entree;
   const tb = TIMBRES.find(x => x.id === jam.timbre) || TIMBRES[0];
   const total = notes.length;
-  // une réarticulation est brève : elle ne doit pas se superposer à la suivante
+  /* ⭐ Toute nouvelle attaque COUPE l'accord en cours, replaquage compris : avec
+     des échantillons longs on entendrait sinon une bouillie au bout de quelques
+     mesures. Une réarticulation est en outre brève. */
+  etoufferAccord(t);
   notes.forEach((n, i) => voix(jam.timbre, n, t, noire * (attenuation ? 1.1 : 2.2), v,
-                               banqueDeVoix(tb, i, total, n)));
+                               banqueDeVoix(tb, i, total, n), true));
   // une basse qui marche : fondamentale, puis quinte à mi-mesure
   const b = 36 + dec;
   const mes = mesureJam() * noire / 4;
@@ -4839,8 +4864,8 @@ function jouerAccordJam(entree, t, rappel, attenuation){
     const pk = jam.proba ? jam.proba.grosse : 100;
     if(pk < 100 && Math.random() * 100 >= pk) return;
     const vb = .14 * (jam.mix ? jam.mix.basse : 1);
-    voix('contrebasse', b, t, noire * 1.4, vb);
-    if(jam.marche) voix('contrebasse', b + 7, t + mes / 2, noire * .9, vb * .87);
+    voix('contrebasse', b, t, noire * 1.4, vb, null, true);
+    if(jam.marche) voix('contrebasse', b + 7, t + mes / 2, noire * .9, vb * .87, null, true);
   }
 }
 
@@ -5100,13 +5125,13 @@ function construireClave(){
 const NOTES_GRILLE = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 
 function nbAccordsVoulu(m){
-  // en clave personnelle, autant d'accords que de pastilles ◆ dans la mesure
+  /* ⚠️⚠️ NE PAS ÉCHANGER `jam.metrique` ICI. La clave personnelle se reconstruit
+     dès que la métrique change : ce va-et-vient l'effaçait à chaque construction
+     de la grille, et il fallait sortir du mode pour la retrouver. En clave
+     personnelle la clave est UNE, commune à toutes les mesures — on compte donc
+     ses pastilles ◆ telles quelles. */
   if(jam.rythme !== 'perso') return 1;
-  const memo = jam.metrique;
-  jam.metrique = m.metrique;
-  const n = changementsJam().length;
-  jam.metrique = memo;
-  return Math.max(1, n);
+  return Math.max(1, changementsJam().length);
 }
 
 /* ⭐⭐ L'ORDRE DES RÉGLAGES, décidé par le mode et le régime. On DÉPLACE les
@@ -5417,6 +5442,7 @@ function lancerJam(){
 }
 function arreterJam(){
   jam.actif = false; clearInterval(jam.horloge); jam.horloge = null;
+  etoufferAccord(contexte().currentTime, .12);   // rien ne doit traîner après l'arrêt
   const b = $('btnStop'); if(b) b.hidden = true;
   const a = $('afficheJam'); if(a) a.hidden = true;
   // ⚠️ vider aussi les repères : ils restaient figés sur la dernière mesure
