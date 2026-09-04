@@ -1509,6 +1509,7 @@ function fabriquerAccord(essai){
       let choisi = bons[Math.floor(Math.random() * bons.length)];
       // ses réductions tiennent déjà dans les sièges : on n'y touche pas
       if(t.pupitres && !sax) choisi = respecterPupitres(choisi, t.pupitres);
+      choisi = replierAigu(choisi, t);
       if(imposeAccord) choisi = garderBasse(choisi, imposeAccord.fondPc);
       /* ⚠️ Même forme que le retour normal, sinon tout ce qui lit `q` casse.
          `basse` et `mode` sont déclarés plus bas : on les recalcule ici. */
@@ -1584,6 +1585,7 @@ function fabriquerAccord(essai){
     // grave boueux, qui s'entend beaucoup plus.
     for(let tour = 0; tour < 3; tour++){
       notes = respecterPupitres(notes, t.pupitres);
+      notes = replierAigu(notes, t);
       if(imposeAccord) notes = garderBasse(notes, imposeAccord.fondPc);
       notes = limitesGraves(notes, t.ambitus[1]);
     }
@@ -1835,20 +1837,23 @@ const TIMBRES = [
   {id:'bois', nom:'Bois', ambitus:[34,96], styles:['serre','drop2'], doublage:0,
    pupitres:[['basson',34,72],['clarinette',50,91],['hautbois',58,91],['flûte',60,96]]},
   {id:'saxes-forte', nuance:'forte', nom:'Saxes forte', groupe:'Saxes', court:'Forte',
-   ambitus:[36,88], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
+   // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
+   ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
    // ce sont ses suraigus, joués plutôt que par un soprano.
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
   {id:'saxes-piano', nuance:'piano', nom:'Saxes piano', groupe:'Saxes', court:'Piano',
-   ambitus:[36,88], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
+   // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
+   ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
    // ce sont ses suraigus, joués plutôt que par un soprano.
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
   // ⚠️ ses pêches sont enregistrées plus bas que les tenues : on relève au tirage
   {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche', gain:1.35,
-   ambitus:[36,88], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
+   // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
+   ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
    // ce sont ses suraigus, joués plutôt que par un soprano.
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
@@ -2041,6 +2046,36 @@ function garderBasse(notes, fondPc){
   const n = notes.slice();
   while(n[i] > bas) n[i] -= 12;
   return n.sort((a, b) => a - b);
+}
+
+/* ⭐ LE SURAIGU DES ALTOS EST UNE EXCEPTION, pas un registre ordinaire. Un tiers
+   des accords montaient au-dessus du fa5, un quart au-dessus du sol5 — bien plus
+   que ce qu'on écrit réellement. On tente donc de replier l'accord ENTIER sous le
+   plafond courant, et on ne monte au-delà que s'il n'y a pas d'autre issue. */
+const PLAFOND_COURANT = 79;          // sol5
+
+const PART_SURAIGU = .15;             // une fois sur sept, on laisse monter
+
+function replierAigu(notes, t){
+  if(!t || !t.section5 || !notes.length) return notes;
+  if(Math.max(...notes) <= PLAFOND_COURANT) return notes;
+  // ⭐ On en laisse passer de temps en temps : un suraigu qui ne sort jamais
+  //    n'est plus une couleur, c'est une interdiction.
+  if(Math.random() < PART_SURAIGU) return notes;
+  for(let k = 1; k <= 2; k++){
+    const bas = notes.map(x => x - 12 * k);
+    if(Math.max(...bas) <= PLAFOND_COURANT && Math.min(...bas) >= t.ambitus[0]
+       && tientDansSieges(bas, t.pupitres)) return bas;
+  }
+  return notes;                      // rien ne tient plus bas : le suraigu est mérité
+}
+
+function tientDansSieges(notes, pupitres){
+  if(!pupitres) return true;
+  return notes.every((m, i) => {
+    const s = pupitres[Math.min(pupitres.length - 1, i)];
+    return m >= s[1] && m <= s[2];
+  });
 }
 
 function respecterPupitres(notes, pupitres){
@@ -2567,7 +2602,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '2.8';
+const VERSION_APP = '3.0';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4764,6 +4799,7 @@ function jouerAccordJam(entree, t, rappel, attenuation){
     notes = reduireVoix(q, max, true).map(x => x + 55 + dec);
   }
   if(tj.pupitres) notes = respecterPupitres(notes, tj.pupitres);
+  notes = replierAigu(notes, tj);
   const noire = 60 / jam.tempo;
   // un rappel sonne plus discrètement que la première frappe de l'accord
   /* Le voisinage : à l'intérieur d'une mesure on prend la disposition la plus
