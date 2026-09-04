@@ -2348,15 +2348,30 @@ function etoufferAccord(quand, temps){
   VOIX_EN_COURS = [];
 }
 
+let COUCHE_ACCORD = null;
+const coucheDe = (t, vol) =>
+  ((t.couches.find(x => vol >= x[0]) || t.couches[t.couches.length - 1])[1]);
+
+/* Pose un accord entier sous une seule couche : on la calcule sur l'intensité
+   de référence, puis on joue, puis on relâche. */
+function sousUneCouche(timbreId, vol, faire){
+  const t = TIMBRES.find(x => x.id === timbreId);
+  COUCHE_ACCORD = (t && t.couches) ? coucheDe(t, vol) : null;
+  try{ faire(); } finally{ COUCHE_ACCORD = null; }
+}
+
 function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
   // un timbre peut porter son propre gain, pour compenser des échantillons
   // gravés plus bas que les autres sans toucher aux fichiers
   const tG = TIMBRES.find(x => x.id === timbreId);
   /* ⭐ Timbre dynamique : on choisit la COUCHE d'après l'intensité demandée, avant
-     que le gain ne la modifie. Plus l'attaque est forte, plus l'échantillon mord. */
+     que le gain ne la modifie. Plus l'attaque est forte, plus l'échantillon mord.
+     ⚠️ La couche vaut pour TOUT L'ACCORD, jamais voix par voix : un pianiste
+     attaque ses touches ensemble. Quand un accord est en cours de pose, sa couche
+     est fixée une fois et s'impose à toutes ses notes — sans quoi le renfort de
+     basse et les ajustements de registre en faisaient basculer certaines. */
   if(tG && tG.couches && !banqueId){
-    const c = tG.couches.find(x => vol >= x[0]) || tG.couches[tG.couches.length - 1];
-    banqueId = c[1];
+    banqueId = COUCHE_ACCORD || coucheDe(tG, vol);
   }
   if(tG && tG.gain) vol *= tG.gain;
   const c = contexte();
@@ -2474,6 +2489,11 @@ function jouer(notes, mode, basse){
   const pas = mode === 'arpege' ? .34 : 0;
   const t = leTimbre();
   const total = basse != null ? notes.length - 1 : notes.length;
+  /* ⚠️ Le renfort de basse et les ajustements de registre font varier l'intensité
+     d'une voix à l'autre : sur un timbre dynamique, certaines basculaient de
+     couche et l'accord mélangeait deux attaques. On fixe donc la couche une fois,
+     sur l'intensité nominale, pour tout l'accord. */
+  sousUneCouche(cfg.timbre, .16, () => {
   notes.forEach((n, i) => {
     const contre = (basse != null && i === 0 && n === basse);
     const estGrave = (i === 0 && notes.length > 1);
@@ -2482,6 +2502,7 @@ function jouer(notes, mode, basse){
     const rang = basse != null ? i - 1 : i;
     voix(cfg.timbre, n, t0 + i * pas, mode === 'arpege' ? 1.5 : 1.9,
          .16 * renfort, banqueDeVoix(t, rang, total, n));
+  });
   });
 }
 
@@ -2645,7 +2666,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.3';
+const VERSION_APP = '3.4';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4046,8 +4067,10 @@ function jouerTonalite(tonaliteVoulue){
   while(Math.max(...notes) > tb.ambitus[1]) notes = notes.map(x => x - 12);
   while(Math.min(...notes) < tb.ambitus[0]) notes = notes.map(x => x + 12);
   if(tb.pupitres) notes = respecterPupitres(notes, tb.pupitres);
-  notes.forEach((n, k) => voix(cfg.timbre, n, t0 + k * .02, 4.2, .13,
-                               banqueDeVoix(tb, k, notes.length, n)));
+  sousUneCouche(cfg.timbre, .13, () => {
+    notes.forEach((n, k) => voix(cfg.timbre, n, t0 + k * .02, 4.2, .13,
+                                 banqueDeVoix(tb, k, notes.length, n)));
+  });
   /* ⚠️ Le bandeau reste MUET pendant une session : nommer la tonalité, c'est
      donner la réponse. On ne l'affiche qu'à la prévisualisation depuis les
      réglages, quand une tonalité précise est demandée. */
@@ -4868,8 +4891,10 @@ function jouerAccordJam(entree, t, rappel, attenuation){
      des échantillons longs on entendrait sinon une bouillie au bout de quelques
      mesures. Une réarticulation est en outre brève. */
   etoufferAccord(t);
-  notes.forEach((n, i) => voix(jam.timbre, n, t, noire * (attenuation ? 1.1 : 2.2), v,
-                               banqueDeVoix(tb, i, total, n), true));
+  sousUneCouche(jam.timbre, v, () => {
+    notes.forEach((n, i) => voix(jam.timbre, n, t, noire * (attenuation ? 1.1 : 2.2), v,
+                                 banqueDeVoix(tb, i, total, n), true));
+  });
   // une basse qui marche : fondamentale, puis quinte à mi-mesure
   const b = 36 + dec;
   const mes = mesureJam() * noire / 4;
