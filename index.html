@@ -2719,7 +2719,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '4.1';
+const VERSION_APP = '4.2';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3919,7 +3919,7 @@ function chargerCfg(){
       });
       if(['rien','basse','nature'].includes(j.affichage)) jam.affichage = j.affichage;
       if(j.niveau === 'perso' || NIVEAUX_CTX.some(n => n.id === j.niveau)) jam.niveau = j.niveau;
-      if(['tenu','pose','clave'].includes(j.accomp)) jam.accomp = j.accomp;
+      if(['tenu','pose','clave','hasard'].includes(j.accomp)) jam.accomp = j.accomp;
       if(TIMBRES.some(t => t.id === j.timbre && !t.basse)) jam.timbre = j.timbre;
       if(Array.isArray(j.familles)){
         const bons = j.familles.filter(f => FAMILLES_JAM.some(x => x.id === f));
@@ -4846,6 +4846,12 @@ function pasJam(){
     // un appui « plein » rejoue l'accord franchement, dans une autre disposition
     else if(jam.accords && jam.courant && rappels.includes(i) && !changes.includes(i))
       jouerAccordJam(jam.courant, t, true);
+    /* ⭐ En « aléatoire », des replaquages tombent d'eux-mêmes sur les attaques du
+       motif — c'est la clave PERSONNELLE qui permet de les placer précisément ;
+       ici on les laisse venir au hasard. */
+    else if(jam.accords && jam.accomp === 'hasard' && jam.courant && !estPerso()
+            && motif && motif[i] && !changes.includes(i) && Math.random() < .18)
+      jouerAccordJam(jam.courant, t, true, .6);
 
     if(changes.includes(i)){                       // un accord change ici
       /* ⭐ En boucle d'étude, le rang ne bouge plus : on ressasse la même mesure
@@ -4958,10 +4964,17 @@ function jouerAccordJam(entree, t, rappel, attenuation){
        « dynamique »  — il est coupé après 2,2 noires, ce qui aère la grille ;
        « sur la clave » — il se réarticule sur les appuis, donc court par nature. */
   const mesureSec = mesureJam() * noire / 4;
+  /* ⭐ « aléatoire » mêle les trois : parfois l'accord tient, parfois il est coupé
+     court, parfois il se replaque. Chaque attaque tire son propre régime, ce qui
+     donne un accompagnement qui respire au lieu de se répéter. */
+  const regime = jam.accomp === 'hasard'
+    ? (Math.random() < .4 ? 'tenu' : Math.random() < .6 ? 'pose' : 'court')
+    : jam.accomp;
   const tenue = attenuation ? Math.min(noire * 1.4, mesureSec)
-              : jam.accomp === 'pose' ? noire * 2.2
+              : regime === 'pose' ? noire * 2.2
+              : regime === 'court' ? noire * (.7 + Math.random() * .8)
               : Math.max(noire, mesureSec * (jam.parMesure || 1));
-  const tronquer = jam.accomp !== 'tenu';
+  const tronquer = regime !== 'tenu';
   etoufferAccord(t);
   sousUneCouche(jam.timbre, v, () => {
     notes.forEach((n, i) => voix(jam.timbre, n, t, tenue, v,
@@ -5074,7 +5087,8 @@ function construireJam(){
   seg('segShaker', 'shaker', [[true,'charleston'],[false,'sans']]);
   seg('segShaker2', 'shaker2', [[true,'shaker'],[false,'sans']]);
   seg('segDecompte', 'decompte', [[true,'avec décompte'],[false,'départ direct']]);
-  seg('segAccomp', 'accomp', [['tenu','tenu'],['pose','dynamique'],['clave','sur la clave']]);
+  seg('segAccomp', 'accomp',
+      [['tenu','tenu'],['pose','dynamique'],['clave','sur la clave'],['hasard','aléatoire']]);
   seg('segAccords', 'accords', [[true,'avec accords'],[false,'métronome seul']]);
   seg('segDivision', 'division', [[2,'blanches'],[4,'noires'],[8,'croches'],[16,'doubles']]);
   /* La métrique écrite ne sert qu'à la rythmique classique ; ailleurs il compose
