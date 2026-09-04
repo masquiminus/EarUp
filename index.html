@@ -1806,6 +1806,9 @@ const TIMBRES = [
   // ⭐ La variante avec chorus : une couleur très typée de cet instrument.
   {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.9, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  // ⭐ La troisième variante de la banque : graves renforcés, notes plus courtes.
+  {id:'rhodes-bass', nom:'Rhodes bass', groupe:'Rhodes', court:'Bass', gain:1.85, ambitus:[28,91], grave:[33,60],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
   {id:'guitareac', nom:'Guitare acoustique', groupe:'Guitare', court:'Acoustique',
    guitare:true, ambitus:[40,78]},
@@ -2563,7 +2566,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '2.5';
+const VERSION_APP = '2.7';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4197,7 +4200,13 @@ const CHAABI = {
   shaker:  Array.from({length:24}, (_, i) => i + 1),
   grosse:  [1,5,11,17,23],
   caisse:  [3,8,15,20],
+  /* ⭐ Les REPLAQUAGES d'accord, tirés au sort : souvent sur les croches 8, 13 et
+     20 ; plus rarement sur 2, 5, 11, 14, 17 et 23. L'accord ne change pas, il se
+     redit — c'est ce qui fait respirer un chaabi. */
+  souvent: [8, 13, 20],
+  rare:    [2, 5, 11, 14, 17, 23],
 };
+const CHAABI_SOUVENT = .45, CHAABI_RARE = .15;
 
 /* ⭐ UNE SÉQUENCE DE MESURES : jusqu'à quatre métriques qui s'enchaînent, pour
    atteindre d'un geste les mesures composées — 4/4 + 7/8 + 3/8 + 2/4, ou trois
@@ -4252,6 +4261,8 @@ const mesureJam = () => estPerso() ? Math.max(2, dureeClave())
 /* Où l'accord change : les valeurs marquées en clave personnelle, le premier
    temps partout ailleurs. */
 function changementsJam(){
+  // ⭐ Le chaabi court sur deux mesures de 12/8 : l'accord change à chacune.
+  if(!estPerso() && laMetrique().special === 'chaabi') return [0, 24];
   if(!estPerso()) return [0];
   const out = []; let i = 0;
   claveCourante().forEach(v => { if(v[2] === 2) out.push(i); i += v[0]; });
@@ -4627,6 +4638,12 @@ function pasJam(){
       // les croches sont numérotées à partir de 1, un pas sur deux
       const cr = (i % 2 === 0) ? (i / 2) + 1 : 0;
       if(cr){
+        // l'accord se redit, au hasard, sans changer
+        if(jam.accords && jam.courant && !changes.includes(i)){
+          const q = CHAABI.souvent.includes(cr) ? CHAABI_SOUVENT
+                  : CHAABI.rare.includes(cr) ? CHAABI_RARE : 0;
+          if(q && Math.random() < q) jouerAccordJam(jam.courant, t, true);
+        }
         if(CHAABI.grosse.includes(cr))  frappe('grosse', t, cr === 1 ? 1 : .85);
         if(CHAABI.caisse.includes(cr))  frappe('caisse', t, .85);
         if(CHAABI.charley.includes(cr)) frappe('charley', t, cr === 1 ? .9 : .6);
