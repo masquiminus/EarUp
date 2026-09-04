@@ -1803,16 +1803,16 @@ const TIMBRES = [
   {id:'piano-feutre', nom:'Piano feutré', groupe:'Piano', court:'Feutré',
    ambitus:[28,96], grave:[33,64],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:2},
-  {id:'rhodes', nom:'Rhodes', groupe:'Rhodes', court:'Nu', gain:1.4, ambitus:[28,91], grave:[33,60],
+  {id:'rhodes', nom:'Rhodes', groupe:'Rhodes', court:'Nu', gain:0.95, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // ⭐ La variante avec chorus : une couleur très typée de cet instrument.
-  {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.9, ambitus:[28,91], grave:[33,60],
+  {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.3, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
   // ⭐ Deux banques retenues après essai ; le Rhodes Mark II a été écarté.
-  {id:'wurlitzer', nom:'Wurlitzer 200', gain:2.9, ambitus:[28,91], grave:[33,60],
+  {id:'wurlitzer', nom:'Wurlitzer 200', gain:1.95, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  {id:'elepian', nom:'Elepian', gain:3.4,
+  {id:'elepian', nom:'Elepian', gain:2.3,
    /* ⭐⭐ TIMBRE DYNAMIQUE : la banque change avec l'intensité demandée.
       Les trois couches gardent leur écart de niveau d'origine — doux est
       10 dB sous fort — de sorte que jouer plus fort ne fait pas que monter
@@ -1845,14 +1845,14 @@ const TIMBRES = [
              ['trompette lead',52,86]]},
   {id:'bois', nom:'Bois', ambitus:[34,96], styles:['serre','drop2'], doublage:0,
    pupitres:[['basson',34,72],['clarinette',50,91],['hautbois',58,91],['flûte',60,96]]},
-  {id:'saxes-forte', nuance:'forte', nom:'Saxes forte', groupe:'Saxes', court:'Forte', gain:1.9,
+  {id:'saxes-forte', nuance:'forte', nom:'Saxes forte', groupe:'Saxes', court:'Forte', gain:1.3,
    // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
    ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
    // ce sont ses suraigus, joués plutôt que par un soprano.
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
-  {id:'saxes-piano', nuance:'piano', nom:'Saxes piano', groupe:'Saxes', court:'Piano', gain:2.8,
+  {id:'saxes-piano', nuance:'piano', nom:'Saxes piano', groupe:'Saxes', court:'Piano', gain:1.9,
    // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
    ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
@@ -1860,7 +1860,7 @@ const TIMBRES = [
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
   // ⚠️ ses pêches sont enregistrées plus bas que les tenues : on relève au tirage
-  {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche', gain:2.3,
+  {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche', gain:1.55,
    // ⚠️ 86 et non 88 : ses altos s'arrêtent au ré6
    ambitus:[36,86], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
@@ -1871,7 +1871,7 @@ const TIMBRES = [
   /* ⚠️ Ses échantillons d'Iowa sont gravés bas — crête médiane à −10 dB —, donc
      la contrebasse paraissait faible face aux saxes. On relève au TIRAGE, jamais
      dans les fichiers : `gain` multiplie le volume de ce timbre. */
-  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:4.2},
+  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:2.8},
 ];
 
 /* Registre de base : donné, ou déduit du pupitre le plus grave. */
@@ -2392,7 +2392,7 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir){
     g.gain.setValueAtTime(vol, quand + duree - .3);   // son tenu, puis relâché
     g.gain.exponentialRampToValueAtTime(.0008, quand + duree);
   }
-  g.connect(c.destination);
+  g.connect(sortie());
   // on retient la voix pour pouvoir l'étouffer si un nouvel accord arrive
   const suivi = tenir ? {g, vol} : null;
   if(suivi) VOIX_EN_COURS.push(suivi);
@@ -2511,6 +2511,28 @@ function jouer(notes, mode, basse){
 const SONS = {juste:[], faux:[], passe:[]};
 let dernierSon = {};
 
+/* ⭐⭐ UNE SORTIE COMMUNE, avec de quoi tenir le niveau. Jusqu'ici chaque voix se
+   branchait DIRECTEMENT sur la sortie : la somme d'un accord de six voix, d'une
+   basse et d'une batterie dépassait le maximum, et le navigateur écrêtait — ce
+   qui salit TOUS les timbres, y compris ceux dont on n'a pas touché le gain.
+   On passe donc par un limiteur, qui retient les crêtes sans écraser le reste. */
+let SORTIE = null;
+function sortie(){
+  const c = contexte();
+  if(SORTIE) return SORTIE;
+  const g = c.createGain();
+  g.gain.value = .72;
+  const lim = c.createDynamicsCompressor();
+  lim.threshold.value = -8;      // on ne retient que ce qui dépasse
+  lim.knee.value = 6;            // en douceur, pour ne pas s'entendre
+  lim.ratio.value = 8;
+  lim.attack.value = .004;
+  lim.release.value = .18;
+  g.connect(lim); lim.connect(c.destination);
+  SORTIE = g;
+  return SORTIE;
+}
+
 function contexte(){
   if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
   if(ctx.state === 'suspended') ctx.resume();
@@ -2572,7 +2594,7 @@ function jouerRetour(cle){
   if(s){
     const src = c.createBufferSource(); src.buffer = s.buf;
     const g = c.createGain(); g.gain.value = .9;
-    src.connect(g); g.connect(c.destination); src.start(t);
+    src.connect(g); g.connect(sortie()); src.start(t);
     return;
   }
   const m = MOTIFS_RETOUR[cle] || MOTIFS_RETOUR.faux;
@@ -2584,7 +2606,7 @@ function jouerRetour(cle){
     g.gain.setValueAtTime(0, t + d2);
     g.gain.linearRampToValueAtTime(m.vol, t + d2 + .01);
     g.gain.exponentialRampToValueAtTime(.0006, t + d2 + m.duree);
-    o.connect(g); g.connect(c.destination);
+    o.connect(g); g.connect(sortie());
     o.start(t + d2); o.stop(t + d2 + m.duree + .2);
   });
 }
@@ -2666,7 +2688,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '3.7';
+const VERSION_APP = '3.8';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4628,7 +4650,7 @@ function frappe(quoi, t, force){
   if(force <= 0) return false;
   const c = contexte();
   const g = c.createGain();
-  g.connect(c.destination);
+  g.connect(sortie());
   if(quoi === 'grosse' || quoi === 'caisse'){
     const o = c.createOscillator();
     o.type = 'sine';
@@ -4668,7 +4690,7 @@ function frappe(quoi, t, force){
     g2.gain.setValueAtTime(force * (quoi === 'caisse' ? .22 : quoi === 'charley' ? .1
                                   : quoi === 'shaker' ? .16 : .07), t);
     g2.gain.exponentialRampToValueAtTime(.0004, t + d);
-    n.connect(f); f.connect(g2); g2.connect(c.destination);
+    n.connect(f); f.connect(g2); g2.connect(sortie());
     n.start(t); n.stop(t + d + .05);
   }
 }
