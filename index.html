@@ -1807,7 +1807,7 @@ const TIMBRES = [
   {id:'rhodes-chorus', nom:'Rhodes chorus', groupe:'Rhodes', court:'Chorus', gain:1.9, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // ⭐ La troisième variante de la banque : graves renforcés, notes plus courtes.
-  {id:'rhodes-bass', nom:'Rhodes bass', groupe:'Rhodes', court:'Bass', gain:1.85, ambitus:[28,91], grave:[33,60],
+  {id:'rhodes-bass', nom:'Rhodes bass', groupe:'Rhodes', court:'Bass', gain:1.5, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
 
   {id:'guitareac', nom:'Guitare acoustique', groupe:'Guitare', court:'Acoustique',
@@ -1846,7 +1846,8 @@ const TIMBRES = [
    // ce sont ses suraigus, joués plutôt que par un soprano.
    pupitres:[['baryton',36,69,'bary'],['ténor',44,76,'tenor'],['ténor',44,76,'tenor'],
              ['alto',49,86,'alto'],['alto',49,86,'alto']]},
-  {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche',
+  // ⚠️ ses pêches sont enregistrées plus bas que les tenues : on relève au tirage
+  {id:'saxes-peche', nuance:'peche', nom:'Saxes pêche', groupe:'Saxes', court:'Pêche', gain:1.35,
    ambitus:[36,88], styles:['serre','drop2','drop24'], doublage:0, voixMax:5, section5:true,
    // ⭐ Ses échantillons : chaque siège dit QUEL sax le joue. L'alto monte à 86,
    // ce sont ses suraigus, joués plutôt que par un soprano.
@@ -1856,7 +1857,7 @@ const TIMBRES = [
   /* ⚠️ Ses échantillons d'Iowa sont gravés bas — crête médiane à −10 dB —, donc
      la contrebasse paraissait faible face aux saxes. On relève au TIRAGE, jamais
      dans les fichiers : `gain` multiplie le volume de ce timbre. */
-  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:1.9},
+  {id:'contrebasse', nom:'Contrebasse', basse:true, ambitus:[28,55], gain:2.6},
 ];
 
 /* Registre de base : donné, ou déduit du pupitre le plus grave. */
@@ -2566,7 +2567,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '2.7';
+const VERSION_APP = '2.8';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -4332,7 +4333,17 @@ function euclidienAuHasard(){
      pas les rendre égales — et on garde le kick clairsemé, le charleston dense,
      sinon le motif n'a plus ni bas ni haut. */
   const entre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-  const POOL = [8, 9, 10, 12, 14, 16, 18];
+  /* ⚠️ Le vivier s'arrêtait à 18 alors que le réglage monte à 32 : les longues
+     séquences ne sortaient jamais. On va jusqu'à 32, en tirant d'abord la TAILLE
+     du motif — court, moyen ou long — pour que les grandes valeurs aient leur
+     vraie chance au lieu d'être noyées parmi les petites. */
+  const VIVIERS = [
+    [6, 7, 8, 9, 10, 11, 12],
+    [12, 13, 14, 15, 16, 18, 20],
+    [20, 21, 22, 24, 26, 28, 30, 32],
+  ];
+  const POOL = VIVIERS[Math.floor(Math.random() * 3)]
+                 .concat(auHasard(VIVIERS[Math.floor(Math.random() * 3)]));
   const prises = [];
   const longueur = () => {
     const libres = POOL.filter(x => !prises.includes(x));
