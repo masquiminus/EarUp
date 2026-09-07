@@ -1509,7 +1509,10 @@ function fabriquerAccord(essai){
           ? n.every((m, i) => { const s = t.pupitres[Math.min(t.pupitres.length - 1, i)];
                                 return m >= s[1] && m <= s[2]; })
           : (Math.min(...n) >= t.ambitus[0] && Math.max(...n) <= t.ambitus[1]);
-        if(bon) bons.push(n);
+        /* ⚠️ Une disposition juste au medium devient injouable deux octaves plus
+           bas : un fa1 et un la1 côte à côte, c'est de la boue. On écarte donc les
+           octaves où l'écartement du grave ne tient plus. */
+        if(bon && graveAcceptable(n)) bons.push(n);
       }
     });
     if(bons.length){
@@ -1520,9 +1523,12 @@ function fabriquerAccord(essai){
          couleur s'entend mieux, et l'accord monte moins haut. */
       const large = x => Math.max(...x) - Math.min(...x);
       let lot = bons;
-      if(bons.length > 2 && Math.random() < .55){
+      /* ⚠️ La règle du grave écarte les positions basses trop serrées, ce qui
+         repousse mécaniquement les accords vers l'aigu : on renforce d'autant la
+         préférence pour le serré, sinon l'un défait l'autre. */
+      if(bons.length > 2 && Math.random() < .68){
         const tri = bons.slice().sort((a2, b2) => large(a2) - large(b2));
-        lot = tri.slice(0, Math.max(2, Math.ceil(tri.length * .4)));
+        lot = tri.slice(0, Math.max(2, Math.ceil(tri.length * .34)));
       }
       let choisi = lot[Math.floor(Math.random() * lot.length)];
       // ses réductions tiennent déjà dans les sièges : on n'y touche pas
@@ -2113,6 +2119,9 @@ const plafondDe = t => t.plafond !== undefined ? t.plafond
 
 function tientDansTimbre(notes, t){
   if(Math.min(...notes) < t.ambitus[0] || Math.max(...notes) > t.ambitus[1]) return false;
+  /* ⚠️ Descendre un accord d'une octave peut le rendre injouable : ce qui sonne
+     au medium devient de la boue dans le grave. On refuse alors le repli. */
+  if(!graveAcceptable(notes)) return false;
   return t.pupitres ? tientDansSieges(notes, t.pupitres) : true;
 }
 
@@ -2224,15 +2233,39 @@ function limiterRepetitions(notes){
 /* Limites graves : plus la basse est basse, plus l'intervalle au-dessus d'elle
    doit être large, sinon le grave devient boueux. Règle d'arrangement classique,
    qui vaut pour toutes les positions — un drop ne l'annule pas. */
+/* ⚠️⚠️ SA RÈGLE POUR LE GRAVE, dictée le 03/09 : dans l'octave 1 l'intervalle le
+   plus petit est la QUINTE ; dans l'octave 2, la quarte ou la quinte — mais la
+   QUARTE AUGMENTÉE EST EXCLUE, trop tendue dans ce registre. Au-dessus, la tierce
+   redevient possible. */
+const ECART_GRAVE = x => x < 36 ? 7 : x < 48 ? 5 : x < 55 ? 4 : 0;
+const TRITON_INTERDIT = x => x < 48;
+
+function graveAcceptable(notes){
+  const n = notes.slice().sort((a, b) => a - b);
+  for(let i = 0; i + 1 < n.length; i++){
+    const e = n[i+1] - n[i];
+    if(e < ECART_GRAVE(n[i])) return false;
+    if(e === 6 && TRITON_INTERDIT(n[i])) return false;
+  }
+  return true;
+}
+
 function limitesGraves(notes, plafond){
   let n = notes.slice().sort((a,b)=>a-b);
-  const seuil = x => x < 40 ? 12 : x < 48 ? 7 : x < 55 ? 4 : 0;
   for(let tour = 0; tour < 24; tour++){
     let bouge = false;
     for(let i = 0; i + 1 < n.length; i++){
-      const mini = seuil(n[i]);
-      if(mini && n[i+1] - n[i] < mini && n[i+1] + 12 <= plafond){
+      const e = n[i+1] - n[i];
+      const trop = e < ECART_GRAVE(n[i]) || (e === 6 && TRITON_INTERDIT(n[i]));
+      if(!trop) continue;
+      if(n[i+1] + 12 <= plafond){
         n[i+1] += 12; n.sort((a,b)=>a-b); bouge = true; break;
+      }
+      /* ⚠️ Si monter la note du dessus buterait sur le plafond, on descend celle
+         du dessous : l'écart s'ouvre quand même. Sans cette issue, 1 % des accords
+         restaient serrés dans le grave faute de place au-dessus. */
+      if(n[i] - 12 >= 21 && graveAcceptable([n[i] - 12, ...n.slice(0, i), ...n.slice(i + 1)])){
+        n[i] -= 12; n.sort((a,b)=>a-b); bouge = true; break;
       }
     }
     if(!bouge) break;
@@ -2781,7 +2814,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '5.2';
+const VERSION_APP = '5.3';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
