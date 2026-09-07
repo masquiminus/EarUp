@@ -261,6 +261,8 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
 .verdict.faux{color:var(--rouge)}
 .reel{font-family:var(--data);font-size:14px;color:var(--texte-2)}
 .gain{font-family:var(--data);font-size:13px;color:var(--ambre)}
+.lotSuite{display:flex;gap:8px;width:100%;max-width:420px;margin:0 auto}
+.lotSuite .suite{flex:1;max-width:none}
 .suite{
   width:100%;max-width:420px;padding:14px;border-radius:10px;
   background:var(--panneau-2);border:1px solid var(--trait);
@@ -376,7 +378,12 @@ h1.section{font-size:12px;letter-spacing:.18em;text-transform:uppercase;
   <div class="pile" id="pile" hidden></div>
   <div class="astuce" id="astuce" hidden>Touche une note pour l'entendre seule · Écouter rejoue l'accord entier</div>
   <div class="gain" id="gain"></div>
-  <button class="suite" id="btnSuite">Suivant</button>
+  <!-- ⭐ Une fois la réponse donnée, on veut pouvoir réentendre l'accord avant de
+       passer : les deux boutons vont donc de pair. -->
+  <div class="lot lotSuite">
+    <button class="suite" id="btnReecouter">Réécouter</button>
+    <button class="suite" id="btnSuite">Suivant</button>
+  </div>
   <button class="lienfin" id="btnFin" hidden>Terminer la session</button>
 </div>
 
@@ -1808,10 +1815,10 @@ const TIMBRES = [
      réarticulations passent au doux —, le « pas fort » ne joue QUE la couche
      douce, ce qui permet de l'entendre pour elle-même et de décider ensuite. */
   {id:'piano', nom:'Piano fort', groupe:'Piano', court:'Fort', gain:1.9,
-   couches:[[.15,'piano-fort'],[0,'piano-doux']], ambitus:[28,91], grave:[33,60],
+   couches:[[.15,'piano-fort'],[0,'piano-doux']], ambitus:[28,96], grave:[33,64],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   {id:'piano-doux', nom:'Piano pas fort', groupe:'Piano', court:'Pas fort', gain:8.5,
-   ambitus:[28,91], grave:[33,60],
+   ambitus:[28,96], grave:[33,64],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // Variantes d'un même instrument : `groupe` les réunit, `court` étiquette le bloc.
   {id:'piano-feutre', nom:'Piano feutré', groupe:'Piano', court:'Feutré',
@@ -2755,7 +2762,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '4.9';
+const VERSION_APP = '5.1';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -3773,6 +3780,8 @@ $('btnEcouter').onclick = () => {
   if(S && S.question) ecouter();
 };
 $('btnSuite').onclick = () => poserQuestion();
+// rejoue l'accord de la question qu'on vient de trancher
+$('btnReecouter').onclick = () => { if(S && S.question) ecouter(); };
 $('btnReglages').onclick = () => { $('zoneBilan').innerHTML = ''; $('tiroir').classList.add('ouvert'); };
 function construireModes(){
   const z = $('zoneModes'); z.innerHTML = '';
