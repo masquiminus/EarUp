@@ -2620,8 +2620,12 @@ function jouer(notes, mode, basse){
     /* ⭐ La basse suit la nuance de la section : sous des PÊCHES, une contrebasse
        qui tient une ronde sonne faux — elle doit être piquée elle aussi. */
     if(contre){
+      /* ⚠️ Le 8e paramètre `tronquer` est INDISPENSABLE ici : sans lui, la règle
+         « ne jamais couper un échantillon avant sa fin » étend la tenue à la
+         longueur du fichier — trois secondes — et le raccourcissement demandé
+         n'a plus aucun effet. */
       const bref = /peche/.test(cfg.timbre);
-      voix('contrebasse', n, t0, bref ? .5 : 1.5, .26 * renfort, null, true);
+      voix('contrebasse', n, t0, bref ? .5 : 1.5, .26 * renfort, null, true, bref);
       return;
     }
     const rang = basse != null ? i - 1 : i;
@@ -2820,7 +2824,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '5.4';
+const VERSION_APP = '5.5';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
