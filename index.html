@@ -1797,23 +1797,25 @@ const TIMBRES = [
    styles:['serre','drop2','ouverte','quartes'], doublage:1},
   // Variantes d'un même instrument : même famille de voicings, nuance différente.
   // `groupe` les réunit sur une ligne, `court` est l'étiquette du bloc.
-  {id:'piano-clair', nom:'Piano clair', groupe:'Piano', court:'Clair',
-   ambitus:[28,96], grave:[33,64],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:2},
+  /* ⭐ SON PIANO ÉCHANTILLONNÉ : 27 notes tous les trois demi-tons, de do0 à fa♯6,
+     en DEUX vélocités (52 et 124). Les graves sonnent 15 s, les aigus moins
+     d'une : la coupe suit le registre — 9 s sous do3, 6 s jusqu'au do5, 3,5 s
+     au-dessus. Il porte l'étiquette « Clair », l'ancienne synthèse du même nom
+     ayant été retirée : elle n'avait plus lieu d'être à côté d'un vrai piano. */
+  /* ⭐ SES DEUX VÉLOCITÉS SONT DEUX TIMBRES, comme ses nuances de saxes : on les
+     choisit, on ne les subit pas. Le « fort » garde sa dynamique — ses
+     réarticulations passent au doux —, le « pas fort » ne joue QUE la couche
+     douce, ce qui permet de l'entendre pour elle-même et de décider ensuite. */
+  {id:'piano', nom:'Piano fort', groupe:'Piano', court:'Fort', gain:1.9,
+   couches:[[.15,'piano-fort'],[0,'piano-doux']], ambitus:[28,91], grave:[33,60],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  {id:'piano-doux', nom:'Piano pas fort', groupe:'Piano', court:'Pas fort', gain:8.5,
+   ambitus:[28,91], grave:[33,60],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  // Variantes d'un même instrument : `groupe` les réunit, `court` étiquette le bloc.
   {id:'piano-feutre', nom:'Piano feutré', groupe:'Piano', court:'Feutré',
    ambitus:[28,96], grave:[33,64],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:2},
-  /* ⭐ Son piano échantillonné : 27 notes tous les trois demi-tons, de do0 à
-     fa♯6, en DEUX vélocités (52 et 124). Les graves sonnent 15 s, les aigus
-     moins d'une : la coupe suit le registre — 9 s sous do3, 6 s jusqu'au do5,
-     3,5 s au-dessus. */
-  {id:'piano', nom:'Piano', gain:1.9,
-   /* ⭐ Deux vélocités enregistrées, 52 et 124, séparées de 14 dB : le piano est
-      donc dynamique lui aussi. Le seuil est placé juste sous l'intensité d'une
-      attaque d'accord, pour que les questions sortent au forte et que les
-      réarticulations restent douces. */
-   couches:[[.15,'piano-fort'],[0,'piano-doux']], ambitus:[28,91], grave:[33,60],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   {id:'rhodes', nom:'Rhodes', groupe:'Rhodes', court:'Nu', gain:0.95, ambitus:[28,91], grave:[33,60],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // ⭐ La variante avec chorus : une couleur très typée de cet instrument.
@@ -1897,9 +1899,16 @@ function registre(t){
    « cuivres » ne changeait rien à ce qu'on entendait. dec = null : son tenu. */
 const PROFILS = {
   synthe:      {att:.010, dec:.45,  chute:1.9, coupe:4200, harm:[[1,1,'triangle'],[2,.28,'sine'],[3,.11,'sine']]},
-  'piano-clair':{att:.004, dec:.30, chute:2.4, coupe:6000, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.22,'sine'],[4,.10,'sine']]},
+  // ⚠️ profil de repli du timbre `piano` : il ne sert que si les échantillons
+  //    ne sont pas chargés, mais il doit exister sous ce nom-là.
+  piano:{att:.004, dec:.30, chute:2.4, coupe:6000, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.22,'sine'],[4,.10,'sine']]},
+  'piano-doux':{att:.006, dec:.38, chute:2.5, coupe:4200, harm:[[1,1,'triangle'],[2,.32,'sine'],[3,.12,'sine']]},
   'piano-feutre':{att:.012,dec:.45, chute:2.6, coupe:2200, harm:[[1,1,'sine'],[2,.25,'sine'],[3,.06,'sine']]},
   rhodes:      {att:.008, dec:.60,  chute:2.6, coupe:2600, harm:[[1,1,'sine'],[2,.20,'sine'],[4,.30,'sine'],[6,.07,'sine']]},
+  /* ⚠️ Replis en synthèse : ils ne servent QUE si les échantillons ne sont pas
+     chargés, mais sans eux ces deux timbres tombaient sur le profil générique. */
+  'rhodes-chorus':{att:.010, dec:.65, chute:2.6, coupe:2500, harm:[[1,1,'sine'],[2,.22,'sine'],[4,.28,'sine'],[6,.08,'sine']], detune:9},
+  wurlitzer:   {att:.006, dec:.42,  chute:2.3, coupe:3200, harm:[[1,1,'triangle'],[2,.34,'sine'],[3,.18,'sine'],[5,.08,'sine']]},
   guitareac:   {att:.004, dec:.30,  chute:1.9, coupe:4600, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.25,'sine'],[5,.10,'sine']]},
   guitareel:   {att:.006, dec:.70,  chute:2.6, coupe:2900, harm:[[1,1,'sawtooth'],[2,.20,'sine']]},
   cordes:      {att:.16,  dec:null, chute:2.3, coupe:3200, harm:[[1,1,'sawtooth'],[2,.30,'sawtooth']], detune:7},
@@ -2730,7 +2739,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '4.5';
+const VERSION_APP = '4.7';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
