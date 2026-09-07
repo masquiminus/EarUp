@@ -1606,6 +1606,7 @@ function fabriquerAccord(essai){
     if(imposeAccord) while(b >= notes[0] - 4 && b - 12 >= 24) b -= 12;
     if(b <= notes[0] - 5 || imposeAccord){ notes = [b, ...notes]; basse = b; }
   }
+  notes = replierAigu(notes, t);
   notes = limiterRepetitions(notes);
   notes = eviterNeuvieme(notes, t.ambitus[1], fondPc, b9Permise);
   const voixBasse = basse === null ? notes[0] : notes[1];
@@ -2085,16 +2086,27 @@ const PLAFOND_COURANT = 79;          // sol5
 
 const PART_SURAIGU = .15;             // une fois sur sept, on laisse monter
 
+/* ⚠️ Le repli ne valait QUE pour les sections de saxes : aux claviers, 57 % des
+   accords dépassaient le do5 et 24 % le do6. Il vaut désormais pour tout timbre,
+   chacun avec son plafond courant — un sax lead ne monte pas comme un piano. */
+const plafondDe = t => t.plafond !== undefined ? t.plafond
+                     : t.section5 ? PLAFOND_COURANT : 83;   // si5 par défaut
+
+function tientDansTimbre(notes, t){
+  if(Math.min(...notes) < t.ambitus[0] || Math.max(...notes) > t.ambitus[1]) return false;
+  return t.pupitres ? tientDansSieges(notes, t.pupitres) : true;
+}
+
 function replierAigu(notes, t){
-  if(!t || !t.section5 || !notes.length) return notes;
-  if(Math.max(...notes) <= PLAFOND_COURANT) return notes;
+  if(!t || !notes.length) return notes;
+  const plafond = plafondDe(t);
+  if(Math.max(...notes) <= plafond) return notes;
   // ⭐ On en laisse passer de temps en temps : un suraigu qui ne sort jamais
   //    n'est plus une couleur, c'est une interdiction.
   if(Math.random() < PART_SURAIGU) return notes;
   for(let k = 1; k <= 2; k++){
     const bas = notes.map(x => x - 12 * k);
-    if(Math.max(...bas) <= PLAFOND_COURANT && Math.min(...bas) >= t.ambitus[0]
-       && tientDansSieges(bas, t.pupitres)) return bas;
+    if(Math.max(...bas) <= plafond && tientDansTimbre(bas, t)) return bas;
   }
   return notes;                      // rien ne tient plus bas : le suraigu est mérité
 }
@@ -2739,7 +2751,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '4.7';
+const VERSION_APP = '4.8';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
