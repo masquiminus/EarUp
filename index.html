@@ -1820,6 +1820,33 @@ const TIMBRES = [
   // Claviers : tessiture très large, position et densité tirées au sort.
   {id:'synthe', nom:'Synthé', ambitus:[36,88], grave:[40,62],
    styles:['serre','drop2','ouverte','quartes'], doublage:1},
+  /* ⭐ La nuance douce de l'ancienne banque : il l'aime bien, on la garde. */
+  {id:'piano-doux', nom:'Piano pas fort', groupe:'Piano', court:'Pas fort', gain:8.5,
+   ambitus:[28,96], grave:[33,64],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  // Variantes d'un même instrument : même famille de voicings, nuance différente.
+  // `groupe` les réunit sur une ligne, `court` est l'étiquette du bloc.
+  /* ⭐⭐ SON PIANO MULTI-NUANCES : 88 touches chromatiques en cinq vélocités, dont
+     il retient TROIS — p, mf, ff — et une note sur trois. Chacune est un timbre
+     qu'on choisit, plus une entrée DYNAMIQUE qui bascule entre elles selon
+     l'intensité. Le « pas fort » de l'ancienne banque reste, il lui plaisait.
+     ⚠️ Les gains conservent l'écart d'origine entre nuances : ce n'est pas qu'une
+     affaire de volume, le mordant monte de 653 à 1028 passages par seconde. */
+  {id:'pianoV-p',  nom:'Piano p',  groupe:'Piano', court:'p',  gain:2.6,
+   ambitus:[28,96], grave:[33,64],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  {id:'pianoV-mf', nom:'Piano mf', groupe:'Piano', court:'mf', gain:2.5,
+   ambitus:[28,96], grave:[33,64],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  {id:'pianoV-ff', nom:'Piano ff', groupe:'Piano', court:'ff', gain:1.75,
+   ambitus:[28,96], grave:[33,64],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
+  {id:'pianoV', nom:'Piano dynamique', groupe:'Piano', court:'Dyn.', gain:2.2,
+   /* Trois paliers : une attaque d'accord sort au ff, une réarticulation au mf,
+      une réarticulation atténuée au p. */
+   couches:[[.165,'pianoV-ff'],[.105,'pianoV-mf'],[0,'pianoV-p']],
+   ambitus:[28,96], grave:[33,64],
+   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // Variantes d'un même instrument : même famille de voicings, nuance différente.
   // `groupe` les réunit sur une ligne, `court` est l'étiquette du bloc.
   /* ⭐ SON PIANO ÉCHANTILLONNÉ : 27 notes tous les trois demi-tons, de do0 à fa♯6,
@@ -1831,12 +1858,6 @@ const TIMBRES = [
      choisit, on ne les subit pas. Le « fort » garde sa dynamique — ses
      réarticulations passent au doux —, le « pas fort » ne joue QUE la couche
      douce, ce qui permet de l'entendre pour elle-même et de décider ensuite. */
-  {id:'piano', nom:'Piano fort', groupe:'Piano', court:'Fort', gain:1.9,
-   couches:[[.15,'piano-fort'],[0,'piano-doux']], ambitus:[28,96], grave:[33,64],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  {id:'piano-doux', nom:'Piano pas fort', groupe:'Piano', court:'Pas fort', gain:8.5,
-   ambitus:[28,96], grave:[33,64],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // Variantes d'un même instrument : `groupe` les réunit, `court` étiquette le bloc.
   {id:'piano-feutre', nom:'Piano feutré', groupe:'Piano', court:'Feutré',
    ambitus:[28,96], grave:[33,64],
@@ -1926,7 +1947,13 @@ const PROFILS = {
   synthe:      {att:.010, dec:.45,  chute:1.9, coupe:4200, harm:[[1,1,'triangle'],[2,.28,'sine'],[3,.11,'sine']]},
   // ⚠️ profil de repli du timbre `piano` : il ne sert que si les échantillons
   //    ne sont pas chargés, mais il doit exister sous ce nom-là.
+  // ⚠️ replis en synthèse, un par timbre de piano : sans eux ils tomberaient sur
+  //    le profil générique quand les échantillons ne sont pas chargés.
   piano:{att:.004, dec:.30, chute:2.4, coupe:6000, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.22,'sine'],[4,.10,'sine']]},
+  pianoV:{att:.004, dec:.30, chute:2.4, coupe:6000, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.22,'sine'],[4,.10,'sine']]},
+  'pianoV-p':{att:.006, dec:.36, chute:2.5, coupe:4200, harm:[[1,1,'triangle'],[2,.30,'sine'],[3,.11,'sine']]},
+  'pianoV-mf':{att:.005, dec:.32, chute:2.4, coupe:5200, harm:[[1,1,'triangle'],[2,.38,'sine'],[3,.16,'sine']]},
+  'pianoV-ff':{att:.004, dec:.28, chute:2.3, coupe:6400, harm:[[1,1,'triangle'],[2,.48,'sine'],[3,.24,'sine'],[4,.11,'sine']]},
   'piano-doux':{att:.006, dec:.38, chute:2.5, coupe:4200, harm:[[1,1,'triangle'],[2,.32,'sine'],[3,.12,'sine']]},
   'piano-feutre':{att:.012,dec:.45, chute:2.6, coupe:2200, harm:[[1,1,'sine'],[2,.25,'sine'],[3,.06,'sine']]},
   rhodes:      {att:.008, dec:.60,  chute:2.6, coupe:2600, harm:[[1,1,'sine'],[2,.20,'sine'],[4,.30,'sine'],[6,.07,'sine']]},
@@ -2316,7 +2343,10 @@ function analyserNom(nom){
   const base = nom.split('/').pop().replace(/\.[^.]+$/,'').toLowerCase();
   const m = base.match(/^(.+?)[-_](\d{1,3})$/);
   if(!m) return null;
-  const id = idsBanques().find(x => x === m[1]);
+  /* ⚠️ Le nom du fichier est mis en minuscules plus haut : la comparaison doit
+     l'être des deux côtés, sinon un identifiant contenant une majuscule — comme
+     « pianoV-ff » — n'est jamais reconnu. */
+  const id = idsBanques().find(x => x.toLowerCase() === m[1]);
   const midi = +m[2];
   if(!id || midi < 12 || midi > 108) return null;
   return {id, midi};
@@ -2824,7 +2854,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '5.5';
+const VERSION_APP = '5.6';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
