@@ -2631,7 +2631,7 @@ function jouer(notes, mode, basse){
   const c = contexte();
   // pas d'anticipation hors du Terrain : rien n'y est calé
   const t0 = c.currentTime + ((cfg.app === 'jam' || cfg.app === 'prat') ? .35 : .05);
-  const pas = mode === 'arpege' ? .34 : 0;
+  const pas = mode === 'arpege' ? .34 : ecartEgrene(cfg.timbre);
   const t = leTimbre();
   const total = basse != null ? notes.length - 1 : notes.length;
   /* ⚠️ Le renfort de basse et les ajustements de registre font varier l'intensité
@@ -2854,7 +2854,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '5.8';
+const VERSION_APP = '5.9';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
@@ -5128,7 +5128,8 @@ function jouerAccordJam(entree, t, rappel, attenuation){
   const tronquer = regime !== 'tenu';
   etoufferAccord(t);
   sousUneCouche(jam.timbre, v, () => {
-    notes.forEach((n, i) => voix(jam.timbre, n, t, tenue, v,
+    const roule = ecartEgrene(jam.timbre);
+    notes.forEach((n, i) => voix(jam.timbre, n, t + i * roule, tenue, v,
                                  banqueDeVoix(tb, i, total, n), true, tronquer));
   });
   // une basse qui marche : fondamentale, puis quinte à mi-mesure
@@ -5405,6 +5406,21 @@ function construireClave(){
    un seul d'ordinaire, autant que de pastilles ◆ en clave personnelle. On touche
    un accord pour le modifier, en deux gestes comme dans les questions : la note,
    puis la nature. La treizième note est « % », qui reconduit le précédent. */
+/* ⭐ L'ÉGRENÉ : de temps en temps, un pianiste ne plaque pas — il fait rouler
+   l'accord de bas en haut en quelques dizaines de millisecondes. Ce n'est pas un
+   arpège, c'est une manière de poser la main. Réservé aux CLAVIERS : une section
+   de saxes ou de cuivres attaque ensemble, par définition. */
+const CLAVIERS_EGRENES = ['piano', 'pianoV', 'piano-doux', 'piano-feutre',
+                          'rhodes', 'rhodes-chorus', 'wurlitzer', 'elepian'];
+const PART_EGRENE = .28;
+
+function ecartEgrene(timbreId){
+  if(!CLAVIERS_EGRENES.includes(timbreId)) return 0;
+  if(Math.random() >= PART_EGRENE) return 0;
+  // entre 12 et 30 ms par voix : on entend rouler, pas arpéger
+  return .012 + Math.random() * .018;
+}
+
 const NOTES_GRILLE = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 
 function nbAccordsVoulu(m){
