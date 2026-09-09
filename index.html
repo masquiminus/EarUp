@@ -1827,24 +1827,19 @@ const TIMBRES = [
   // Variantes d'un même instrument : même famille de voicings, nuance différente.
   // `groupe` les réunit sur une ligne, `court` est l'étiquette du bloc.
   /* ⭐⭐ SON PIANO MULTI-NUANCES : 88 touches chromatiques en cinq vélocités, dont
-     il retient TROIS — p, mf, ff — et une note sur trois. Chacune est un timbre
-     qu'on choisit, plus une entrée DYNAMIQUE qui bascule entre elles selon
-     l'intensité. Le « pas fort » de l'ancienne banque reste, il lui plaisait.
+     il retient TROIS — p, mf, ff — et une note sur trois. ⚠️ Elles ne sont PAS
+     choisissables séparément : ce sont des COUCHES d'un seul timbre, « Dynamique »,
+     qui bascule entre elles selon l'intensité. Le « pas fort » de l'ancienne
+     banque reste, il lui plaisait.
      ⚠️ Les gains conservent l'écart d'origine entre nuances : ce n'est pas qu'une
      affaire de volume, le mordant monte de 653 à 1028 passages par seconde. */
-  {id:'pianoV-p',  nom:'Piano p',  groupe:'Piano', court:'p',  gain:2.6,
-   ambitus:[28,96], grave:[33,64],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  {id:'pianoV-mf', nom:'Piano mf', groupe:'Piano', court:'mf', gain:2.5,
-   ambitus:[28,96], grave:[33,64],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  {id:'pianoV-ff', nom:'Piano ff', groupe:'Piano', court:'ff', gain:1.75,
-   ambitus:[28,96], grave:[33,64],
-   styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
-  {id:'pianoV', nom:'Piano dynamique', groupe:'Piano', court:'Dyn.', gain:2.2,
-   /* Trois paliers : une attaque d'accord sort au ff, une réarticulation au mf,
-      une réarticulation atténuée au p. */
-   couches:[[.165,'pianoV-ff'],[.105,'pianoV-mf'],[0,'pianoV-p']],
+  {id:'pianoV', nom:'Piano dynamique', groupe:'Piano', court:'Dynamique', gain:2.2,
+   /* ⭐ SA RÈGLE : la nuance n'est PAS dictée par le contexte, c'est un choix
+      d'interprète. On tire donc au sort — une majorité de mf, avec des p et des ff
+      qui donnent de la vie. Un replaquage peut être plus doux que le placage de
+      départ, mais aussi de même force ; et le placage de départ peut être
+      n'importe laquelle des trois. */
+   tirage:[['pianoV-mf', .56], ['pianoV-p', .22], ['pianoV-ff', .22]],
    ambitus:[28,96], grave:[33,64],
    styles:['serre','drop2','drop24','ouverte','quartes','quintes'], doublage:1},
   // Variantes d'un même instrument : même famille de voicings, nuance différente.
@@ -1949,11 +1944,7 @@ const PROFILS = {
   //    ne sont pas chargés, mais il doit exister sous ce nom-là.
   // ⚠️ replis en synthèse, un par timbre de piano : sans eux ils tomberaient sur
   //    le profil générique quand les échantillons ne sont pas chargés.
-  piano:{att:.004, dec:.30, chute:2.4, coupe:6000, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.22,'sine'],[4,.10,'sine']]},
   pianoV:{att:.004, dec:.30, chute:2.4, coupe:6000, harm:[[1,1,'triangle'],[2,.45,'sine'],[3,.22,'sine'],[4,.10,'sine']]},
-  'pianoV-p':{att:.006, dec:.36, chute:2.5, coupe:4200, harm:[[1,1,'triangle'],[2,.30,'sine'],[3,.11,'sine']]},
-  'pianoV-mf':{att:.005, dec:.32, chute:2.4, coupe:5200, harm:[[1,1,'triangle'],[2,.38,'sine'],[3,.16,'sine']]},
-  'pianoV-ff':{att:.004, dec:.28, chute:2.3, coupe:6400, harm:[[1,1,'triangle'],[2,.48,'sine'],[3,.24,'sine'],[4,.11,'sine']]},
   'piano-doux':{att:.006, dec:.38, chute:2.5, coupe:4200, harm:[[1,1,'triangle'],[2,.32,'sine'],[3,.12,'sine']]},
   'piano-feutre':{att:.012,dec:.45, chute:2.6, coupe:2200, harm:[[1,1,'sine'],[2,.25,'sine'],[3,.06,'sine']]},
   rhodes:      {att:.008, dec:.60,  chute:2.6, coupe:2600, harm:[[1,1,'sine'],[2,.20,'sine'],[4,.30,'sine'],[6,.07,'sine']]},
@@ -2334,7 +2325,8 @@ const BANQUES_SAX = [];
 /* ⚠️ Les COUCHES d'un timbre dynamique ne sont pas des timbres : elles n'ont pas
    d'entrée dans TIMBRES, mais leurs fichiers doivent quand même être reconnus. */
 const idsBanques = () => TIMBRES.map(t => t.id).concat(BANQUES_SAX)
-  .concat(TIMBRES.flatMap(t => (t.couches || []).map(c => c[1])));
+  .concat(TIMBRES.flatMap(t => (t.couches || []).map(c => c[1])))
+  .concat(TIMBRES.flatMap(t => (t.tirage || []).map(c => c[0])));
 
 function analyserNom(nom){
   /* ⭐ Les entrées peuvent porter un DOSSIER — « saxes/saxbary-forte-36.mp3 » —
@@ -2470,14 +2462,22 @@ function etoufferAccord(quand, temps){
 }
 
 let COUCHE_ACCORD = null;
-const coucheDe = (t, vol) =>
-  ((t.couches.find(x => vol >= x[0]) || t.couches[t.couches.length - 1])[1]);
+/* Deux façons de choisir une couche : par SEUIL, quand la nuance suit l'intensité
+   (l'Elepian), ou par TIRAGE pondéré, quand elle relève de l'interprétation. */
+function coucheDe(t, vol){
+  if(t.tirage){
+    let r = Math.random();
+    for(const [id, part] of t.tirage){ r -= part; if(r <= 0) return id; }
+    return t.tirage[0][0];
+  }
+  return (t.couches.find(x => vol >= x[0]) || t.couches[t.couches.length - 1])[1];
+}
 
 /* Pose un accord entier sous une seule couche : on la calcule sur l'intensité
    de référence, puis on joue, puis on relâche. */
 function sousUneCouche(timbreId, vol, faire){
   const t = TIMBRES.find(x => x.id === timbreId);
-  COUCHE_ACCORD = (t && t.couches) ? coucheDe(t, vol) : null;
+  COUCHE_ACCORD = (t && (t.couches || t.tirage)) ? coucheDe(t, vol) : null;
   try{ faire(); } finally{ COUCHE_ACCORD = null; }
 }
 
@@ -2491,7 +2491,7 @@ function voix(timbreId, midi, quand, duree, vol, banqueId, tenir, tronquer){
      attaque ses touches ensemble. Quand un accord est en cours de pose, sa couche
      est fixée une fois et s'impose à toutes ses notes — sans quoi le renfort de
      basse et les ajustements de registre en faisaient basculer certaines. */
-  if(tG && tG.couches && !banqueId){
+  if(tG && (tG.couches || tG.tirage) && !banqueId){
     banqueId = COUCHE_ACCORD || coucheDe(tG, vol);
   }
   if(tG && tG.gain) vol *= tG.gain;
@@ -2854,7 +2854,7 @@ function points(secondes, ecoutes){
    ============================================================ */
 /* Le numéro de version, affiché dans les réglages : quand quelqu'un signale un
    défaut, on sait tout de suite ce qu'il a sous les yeux. */
-const VERSION_APP = '5.6';
+const VERSION_APP = '5.8';
 const $ = id => document.getElementById(id);
 const elRep = $('reponses'), elRetour = $('retour'), elPile = $('pile');
 
